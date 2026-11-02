@@ -1,0 +1,71 @@
+{
+  "channelJid": "120363430301683531@newsletter",
+  "channels": [
+    {
+      "jid": "120363012345678901@newsletter",
+      "name": "My WhatsApp Channel",
+      "enabled": true
+    }
+  ],
+  "telegram": {
+    "enabled": false,
+    "botToken": "",
+    "chats": [
+      {
+        "chatId": "-1001234567890",
+        "name": "My Telegram Channel",
+        "enabled": true
+      }
+    ]
+  },
+  "selection": {
+    "modules": [],
+    "subtopics": [],
+    "mode": "sequence"
+  },
+  "bankPaths": [
+    "./banks/Court_Clerk_2000_Master_Question_Bank.json",
+    "./banks/volume1_questions.json",
+    "./banks/volume2_questions.json",
+    "./banks/volume3_questions.json",
+    "./banks/expected_questions_bank.json"
+  ],
+  "timezone": "Asia/Kolkata",
+  "mode": "quiz",
+  "postTimes": [
+    "08:00",
+    "20:00"
+  ],
+  "language": "both",
+  "rotateModules": true,
+  "shuffleOptions": true,
+  "showModuleTag": true,
+  "showQuestionNumber": true,
+  "showSubtopic": false,
+  "showExplanation": true,
+  "headerEmoji": "📘",
+  "answerEmoji": "✅",
+  "replyPrompt": "Reply with your answer 👇",
+  "hashtags": [
+    "#HSSC",
+    "#GroupD",
+    "#HaryanaGK",
+    "#PYQ"
+  ],
+  "dryRun": false,
+  "loginMethod": "qr",
+  "phoneNumber": "",
+  "resetWhenFinished": false,
+  "skipDuplicateOptions": true,
+  "batch": {
+    "size": 50,
+    "gapSeconds": 3,
+    "includeAnswer": false,
+    "introMessage": true,
+    "style": "quiz",
+    "scorePrompt": "❓ *What's your score?* Reply with how many you got right 👇",
+    "scorePoll": true,
+    "scorePollPrompt": "❓ *What's your score?* Tap the band you got 👇",
+    "scoreBands": []
+  }
+}

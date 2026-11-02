@@ -1,0 +1,2056 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Question Poster</title>
+<style>
+:root {
+  --bg: #0a0c10;
+  --bg2: #0d1015;
+  --card: #14181f;
+  --card2: #1a1f27;
+  --line: #232a35;
+  --line2: #2e3744;
+  --text: #e9eef7;
+  --muted: #94a1b5;
+  --dim: #6b7789;
+  --green: #22c55e;
+  --green2: #4ade80;
+  --green-dim: #12351f;
+  --amber: #f59e0b;
+  --red: #ef4444;
+  --blue: #60a5fa;
+  --accent: var(--green);
+  --radius: 18px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { scroll-behavior: smooth; scroll-padding-top: 116px; }
+body {
+  margin: 0;
+  background:
+    radial-gradient(900px 480px at 12% -12%, rgba(34, 197, 94, .12), transparent 62%),
+    radial-gradient(760px 420px at 100% -8%, rgba(96, 165, 250, .07), transparent 60%),
+    var(--bg);
+  color: var(--text);
+  font: 15px/1.55 "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, p { margin: 0; }
+h1 { font-size: 16px; font-weight: 700; letter-spacing: -.2px; }
+h2 { font-size: 15px; font-weight: 650; letter-spacing: -.01em; display: flex; align-items: center; gap: 10px; min-width: 0; }
+h3 { font-size: 16px; font-weight: 650; }
+
+/* ---------- app bar ---------- */
+.topbar {
+  position: sticky; top: 0; z-index: 40;
+  background: rgba(10, 12, 16, .88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--line);
+}
+.appbar-in {
+  max-width: 1140px; margin: 0 auto;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px;
+}
+.brand { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.logo {
+  width: 36px; height: 36px; border-radius: 11px; flex: none;
+  background: linear-gradient(145deg, #2ee06a, #159a45);
+  color: #04220e; display: grid; place-items: center;
+  font-weight: 800; font-size: 18px;
+  box-shadow: 0 6px 18px rgba(34, 197, 94, .28);
+}
+.brandtext { min-width: 0; }
+.brand h1 { white-space: nowrap; }
+.brandsub { font-size: 11.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hspace { flex: 1; }
+.hstats { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; color: var(--muted);
+  background: var(--card2); border: 1px solid var(--line);
+  white-space: nowrap;
+}
+.chip b { color: var(--text); font-weight: 700; }
+.chip.dry { color: #ffe9a8; background: #2a2311; border-color: #5b4a1a; }
+.pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 34px; padding: 0 12px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 650;
+  background: var(--card2); border: 1px solid var(--line); color: var(--muted);
+  cursor: pointer; flex: none;
+}
+.pill .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--dim); box-shadow: 0 0 0 3px rgba(148, 161, 181, .12);
+}
+.pill.connected { color: #8ef0b3; border-color: #1d4a2e; background: #0f2318; }
+.pill.connected .dot { background: var(--green); box-shadow: 0 0 0 3px rgba(34, 197, 94, .18); }
+.pill.awaiting_qr, .pill.connecting { color: #ffe9a8; border-color: #4a3a12; background: #241e0e; }
+.pill.awaiting_qr .dot, .pill.connecting .dot { background: var(--amber); box-shadow: 0 0 0 3px rgba(245, 158, 11, .16); }
+.pill.logged_out, .pill.disconnected { color: #ffb4b4; border-color: #4a1e1e; background: #251214; }
+.pill.logged_out .dot, .pill.disconnected .dot { background: var(--red); box-shadow: 0 0 0 3px rgba(239, 68, 68, .16); }
+
+/* ---------- tabs ---------- */
+.tabbar-in {
+  max-width: 1140px; margin: 0 auto;
+  display: flex; gap: 2px; padding: 0 10px;
+  overflow-x: auto; scrollbar-width: none;
+}
+.tabbar-in::-webkit-scrollbar { display: none; }
+.tabbtn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 0 14px; min-height: 47px;
+  border: 0; border-bottom: 2px solid transparent; border-radius: 0;
+  background: none; color: var(--muted);
+  font-size: 13.5px; font-weight: 600;
+  white-space: nowrap; flex: none;
+}
+.tabbtn svg { width: 17px; height: 17px; opacity: .8; }
+.tabbtn:hover { background: rgba(255, 255, 255, .03); color: var(--text); }
+.tabbtn.active { color: var(--text); border-bottom-color: var(--green); }
+.tabbtn.active svg { color: var(--green); opacity: 1; }
+.navbadge {
+  min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 999px; background: var(--card2); border: 1px solid var(--line);
+  font-size: 10.5px; display: inline-grid; place-items: center; color: var(--muted);
+}
+.navbadge:empty { display: none; }
+.navdot { width: 7px; height: 7px; border-radius: 50%; background: #2b3340; display: none; }
+.navdot.on { display: inline-block; background: var(--green); box-shadow: 0 0 0 3px rgba(34, 197, 94, .15); }
+
+/* ---------- layout ---------- */
+.wrap { max-width: 1140px; margin: 0 auto; padding: 20px 16px 28px; }
+.tab { display: none; }
+.tab.active { display: block; animation: fadeUp .22s ease-out; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.grid { display: grid; gap: 16px; align-items: start; }
+.grid.two { grid-template-columns: 1fr 1fr; }
+.grid.post-grid { grid-template-columns: 1.16fr .84fr; }
+@media (max-width: 980px) { .grid.two, .grid.post-grid { grid-template-columns: 1fr; } }
+.stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+.card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .025), rgba(255, 255, 255, 0) 120px), var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+  min-width: 0;
+}
+.logcard { margin-top: 16px; }
+.cardhead { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; min-height: 28px; }
+.cardhead h2 { flex: 1; }
+.step {
+  width: 24px; height: 24px; border-radius: 8px; flex: none;
+  background: var(--green-dim); color: #7ee2a0;
+  display: inline-grid; place-items: center;
+  font-size: 12px; font-weight: 800; letter-spacing: 0;
+}
+
+/* ---------- forms ---------- */
+label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 7px; letter-spacing: .15px; }
+input[type=text], input[type=password], input[type=number], input[type=tel], input[type=search], select {
+  width: 100%; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--bg2); color: var(--text);
+  font-size: 16px; font-family: inherit; min-height: 46px;
+  transition: border-color .15s, box-shadow .15s;
+}
+input:hover, select:hover { border-color: var(--line2); }
+input:focus, select:focus {
+  outline: none; border-color: rgba(34, 197, 94, .65);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, .15);
+}
+input::placeholder { color: #5c687a; }
+select {
+  appearance: none; -webkit-appearance: none;
+  padding-right: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394a1b5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 14px;
+}
+.hidden-select {
+  position: absolute !important; width: 1px; height: 1px; padding: 0;
+  opacity: 0; pointer-events: none; overflow: hidden; clip: rect(0 0 0 0);
+}
+.row { display: flex; gap: 12px; }
+.row > div { flex: 1; min-width: 0; }
+.inline { display: flex; gap: 8px; align-items: stretch; }
+.inline > input, .inline > select { flex: 1; min-width: 0; }
+.inline > button { flex: none; }
+@media (max-width: 520px) {
+  .row { flex-direction: column; gap: 10px; }
+  .inline { flex-wrap: wrap; }
+  .inline > button { width: 100%; }
+}
+
+/* ---------- buttons ---------- */
+button {
+  font-family: inherit; font-size: 14px; font-weight: 600;
+  color: var(--text); background: var(--card2);
+  border: 1px solid var(--line); border-radius: 12px;
+  padding: 0 16px; min-height: 44px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  cursor: pointer; touch-action: manipulation;
+  transition: background .15s, border-color .15s, transform .06s, box-shadow .15s;
+}
+button:hover { border-color: var(--line2); background: #1f252e; }
+button:active { transform: scale(.985); }
+button:disabled { opacity: .42; cursor: not-allowed; transform: none; box-shadow: none; }
+button.primary {
+  background: linear-gradient(180deg, #2ee06a, #1cb554);
+  border-color: #1cb554; color: #05240f;
+  box-shadow: 0 8px 20px rgba(34, 197, 94, .22);
+}
+button.primary:hover { filter: brightness(1.06); border-color: #2ee06a; }
+button.ghost { background: transparent; }
+button.danger { color: #ffb4b4; border-color: rgba(239, 68, 68, .35); background: rgba(239, 68, 68, .08); }
+button.danger:hover { background: rgba(239, 68, 68, .14); border-color: rgba(239, 68, 68, .55); }
+button.small { min-height: 34px; padding: 0 12px; font-size: 12.5px; border-radius: 10px; }
+button.iconbtn { width: 34px; height: 34px; min-height: 34px; padding: 0; border-radius: 9px; background: transparent; color: var(--dim); font-size: 15px; }
+button.iconbtn:hover { color: #ffb4b4; border-color: rgba(239, 68, 68, .4); background: rgba(239, 68, 68, .08); }
+.btnrow { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+@media (max-width: 520px) { .btnrow button { flex: 1 1 auto; } }
+
+/* ---------- switches ---------- */
+.check { display: flex; align-items: flex-start; gap: 12px; padding: 9px 0; cursor: pointer; margin: 0; }
+.check input[type=checkbox], .target input[type=checkbox] {
+  appearance: none; -webkit-appearance: none;
+  width: 40px; height: 23px; border-radius: 999px;
+  background: #252c37; border: 1px solid #333c49;
+  position: relative; flex: none; margin: 0; cursor: pointer;
+  transition: background .18s, border-color .18s;
+}
+.check input[type=checkbox]::after, .target input[type=checkbox]::after {
+  content: ""; position: absolute; top: 2px; left: 2px;
+  width: 17px; height: 17px; border-radius: 50%;
+  background: #8b97a8; transition: transform .18s, background .18s;
+}
+.check input[type=checkbox]:checked, .target input[type=checkbox]:checked { background: var(--green); border-color: var(--green); }
+.check input[type=checkbox]:checked::after, .target input[type=checkbox]:checked::after { transform: translateX(17px); background: #06210f; }
+.check input[type=checkbox]:disabled { opacity: .4; cursor: not-allowed; }
+.check label {
+  font-size: 13.5px; font-weight: 500; color: var(--text);
+  margin: 0; line-height: 1.45; cursor: pointer; letter-spacing: 0;
+}
+.check.dryrow {
+  margin-top: 14px; padding: 12px;
+  border: 1px dashed #4a3a12; border-radius: 12px;
+  background: rgba(245, 158, 11, .05);
+}
+
+/* ---------- radio cards ---------- */
+.radiocards { display: grid; gap: 8px; }
+.radiocards label {
+  display: flex; gap: 11px; align-items: flex-start;
+  padding: 12px 14px; margin: 0;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: var(--bg2); cursor: pointer; letter-spacing: 0;
+}
+.radiocards label:hover { border-color: var(--line2); }
+.radiocards label:has(input:checked) { border-color: rgba(34, 197, 94, .55); background: rgba(34, 197, 94, .07); }
+.radiocards input {
+  appearance: none; -webkit-appearance: none;
+  width: 18px; height: 18px; border-radius: 50%; flex: none;
+  border: 2px solid #3c4757; background: transparent;
+  margin: 2px 0 0; cursor: pointer;
+}
+.radiocards input:checked {
+  border-color: var(--green);
+  background: radial-gradient(circle, var(--green) 0 4.5px, transparent 5px);
+}
+.radiocards .t { display: block; font-size: 13.5px; font-weight: 600; color: var(--text); }
+.radiocards .d { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.45; font-weight: 400; }
+
+/* ---------- segmented ---------- */
+.seg { display: grid; grid-auto-flow: column; gap: 5px; background: var(--bg2); border: 1px solid var(--line); border-radius: 12px; padding: 5px; }
+.seg label {
+  display: flex; align-items: center; justify-content: center;
+  margin: 0; padding: 9px 10px; border-radius: 9px;
+  font-size: 13px; font-weight: 600; color: var(--muted);
+  cursor: pointer; letter-spacing: 0; transition: background .15s, color .15s;
+}
+.seg input { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
+.seg label:has(input:checked) { background: var(--card2); color: var(--text); box-shadow: inset 0 0 0 1px var(--line2); }
+
+/* ---------- misc ---------- */
+[hidden] { display: none !important; }
+.estimate { font-size: 12px; color: var(--dim); margin-top: 8px; min-height: 16px; }
+.postto {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12.5px; color: var(--muted);
+  margin-top: 14px; padding: 9px 12px;
+  border-radius: 10px; background: var(--bg2); border: 1px solid var(--line);
+}
+.postto b { color: var(--text); font-weight: 600; }
+.dotlive { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex: none; }
+.bar { height: 6px; background: var(--bg2); border-radius: 999px; overflow: hidden; margin: 16px 0 8px; border: 1px solid var(--line); }
+.bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--green), var(--green2)); border-radius: 999px; transition: width .25s; }
+.bartext { font-size: 12px; color: var(--muted); min-height: 18px; }
+.banner { display: none; margin-top: 14px; padding: 11px 13px; border-radius: 12px; font-size: 13px; line-height: 1.5; border: 1px solid transparent; }
+.banner.show { display: block; }
+.banner.bad { background: rgba(239, 68, 68, .08); border-color: rgba(239, 68, 68, .35); color: #ffc9c9; }
+.banner.warn { background: rgba(245, 158, 11, .08); border-color: rgba(245, 158, 11, .32); color: #ffe9a8; }
+.banner.good { background: rgba(34, 197, 94, .07); border-color: rgba(34, 197, 94, .28); color: #b6f0c8; }
+.hint { font-size: 11.5px; color: var(--dim); margin-top: 9px; line-height: 1.55; }
+.hint b { color: var(--muted); font-weight: 600; }
+.subcard { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.avail { font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+.avail b { color: var(--green); font-size: 14px; font-weight: 700; }
+.availchip {
+  font-size: 11.5px; color: var(--muted);
+  background: var(--card2); border: 1px solid var(--line);
+  border-radius: 999px; padding: 3px 9px; white-space: nowrap;
+}
+.empty {
+  padding: 18px 12px; text-align: center;
+  color: var(--dim); font-size: 12.5px;
+  border: 1px dashed var(--line); border-radius: 12px;
+  background: rgba(255, 255, 255, .012);
+}
+.status { font-size: 12.5px; color: var(--muted); margin-top: 12px; line-height: 1.5; }
+.status b { color: var(--text); }
+.status .nextrun { display: block; margin-top: 4px; color: #8ef0b3; }
+
+/* ---------- question mix ---------- */
+.presets { display: flex; flex-wrap: wrap; gap: 7px; }
+.preset {
+  min-height: 34px; padding: 0 12px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 600;
+  background: var(--bg2); border: 1px solid var(--line); color: var(--muted);
+}
+.preset:hover { color: var(--text); border-color: var(--line2); background: var(--card2); }
+.preset.on { color: #c9f7d8; border-color: rgba(34, 197, 94, .55); background: rgba(34, 197, 94, .1); }
+.quotalist { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.quotalist:empty { display: none; }
+.qrow {
+  display: grid; grid-template-columns: 1fr 88px 34px; gap: 8px; align-items: center;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg2);
+}
+.qrow .qname { min-width: 0; }
+.qrow .qname b {
+  display: block; font-size: 12.5px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.qrow .qname span { font-size: 10.5px; color: var(--dim); }
+.qrow input { min-height: 36px; padding: 6px 8px; text-align: center; }
+.qrow.short .qname span { color: #fcd34d; }
+.qrow.short input { border-color: rgba(245, 158, 11, .55); }
+.hr { height: 1px; border: 0; background: var(--line); margin: 16px 0; }
+.mixnote {
+  margin-top: 10px; padding: 9px 11px;
+  border-radius: 10px; border: 1px solid #4a3a12;
+  background: rgba(245, 158, 11, .06);
+  font-size: 11.5px; color: #ffe9a8; line-height: 1.5;
+}
+@media (max-width: 420px) {
+  .qrow { grid-template-columns: 1fr 74px 32px; }
+}
+
+/* ---------- pickers ---------- */
+.pickerbox { min-width: 0; }
+.plabel { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pcount { font-size: 11px; color: var(--dim); }
+.picker {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  max-height: 176px; overflow: auto;
+  padding: 9px; background: var(--bg2);
+  border: 1px solid var(--line); border-radius: 12px;
+}
+.opt {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 30px; padding: 5px 10px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--card2);
+  color: var(--muted); font-size: 12px; font-weight: 500; line-height: 1.2;
+}
+.opt:hover { background: #1f252e; border-color: var(--line2); }
+.opt .tick { display: none; font-size: 10px; }
+.opt.on { color: #c9f7d8; border-color: rgba(34, 197, 94, .5); background: rgba(34, 197, 94, .12); }
+.opt.on .tick { display: inline; }
+.opt .cnt { font-size: 10.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.opt.on .cnt { color: #7fd39a; }
+
+/* ---------- day chips ---------- */
+.dayrow { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.dayrow label {
+  display: grid; place-items: center;
+  width: 42px; height: 38px; margin: 0;
+  border-radius: 10px; border: 1px solid var(--line);
+  background: var(--bg2); font-size: 12.5px; font-weight: 600;
+  color: var(--muted); cursor: pointer; user-select: none; letter-spacing: 0;
+}
+.dayrow label:has(input:checked) { border-color: rgba(34, 197, 94, .6); background: rgba(34, 197, 94, .1); color: #c9f7d8; }
+.dayrow input { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
+
+/* ---------- targets ---------- */
+.target {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px; margin-bottom: 8px;
+  border: 1px solid var(--line); border-radius: 14px;
+  background: var(--bg2);
+}
+.target:last-child { margin-bottom: 0; }
+.target .tinfo { flex: 1; min-width: 0; }
+.target .tname { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; min-width: 0; }
+.target .tname > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.target .tsub { font-size: 11px; color: var(--dim); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tprog { height: 4px; background: #1b212a; border-radius: 99px; margin-top: 7px; overflow: hidden; }
+.tprog > i { display: block; height: 100%; background: linear-gradient(90deg, var(--green), var(--green2)); border-radius: 99px; }
+.tag {
+  display: inline-flex; align-items: center; flex: none;
+  border-radius: 6px; padding: 2px 6px;
+  font-size: 10px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase;
+  border: 1px solid var(--line); background: var(--card2); color: var(--muted);
+}
+.tag.wa { color: #8ef0b3; border-color: #1d4a2e; background: #0f2318; }
+.tag.tg { color: #9ecbff; border-color: #1e3a5f; background: #0e1f33; }
+
+/* ---------- runs ---------- */
+.runs { display: flex; flex-direction: column; }
+.runs .run {
+  display: grid; grid-template-columns: 96px 1fr auto; gap: 12px; align-items: center;
+  padding: 10px 0; border-bottom: 1px solid var(--line);
+}
+.runs .run:last-child { border-bottom: 0; }
+.runs .when { font-size: 11.5px; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.runs .what {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  font-size: 13px; font-weight: 500; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.runs .num { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.runs .num.bad { color: #ffb4b4; }
+.mini {
+  display: inline-block; font-size: 10px; font-weight: 700;
+  letter-spacing: .3px; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 6px;
+  background: var(--card2); border: 1px solid var(--line); color: var(--muted);
+}
+.mini.auto { color: #8ef0b3; border-color: #1d4a2e; background: #0f2318; }
+.mini.bad { color: #ffb4b4; border-color: rgba(239, 68, 68, .4); background: rgba(239, 68, 68, .08); }
+
+/* ---------- log ---------- */
+.log {
+  background: #07090d; border: 1px solid var(--line); border-radius: 12px;
+  padding: 12px; min-height: 72px; max-height: 340px; overflow: auto;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 12px; line-height: 1.6;
+}
+.log .l { display: flex; gap: 8px; white-space: pre-wrap; word-break: break-word; }
+.log .lt { color: #556173; flex: none; }
+.lg-ok { color: #86efac; }
+.lg-err { color: #fca5a5; }
+.lg-warn { color: #fcd34d; }
+.lg-info { color: #9fb0c9; }
+.tinyselect { width: auto; min-height: 34px; padding: 5px 30px 5px 10px; font-size: 12px; border-radius: 9px; background-position: right 8px center; }
+
+/* ---------- connection ---------- */
+#qrBox { text-align: center; }
+#qrImg { width: 240px; height: 240px; background: #fff; border-radius: 12px; padding: 8px; }
+#pairBox { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); }
+#pairBox .pairrow { display: flex; gap: 8px; margin-top: 8px; }
+#pairPhone { flex: 1; min-width: 0; }
+#pairCodeBox { display: none; margin-top: 14px; text-align: center; }
+#pairCode {
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 30px; letter-spacing: 6px; font-weight: 700; color: #8ef0b3;
+  background: var(--bg2); border: 1px dashed #2c5a3a;
+  border-radius: 12px; padding: 14px; margin-top: 8px;
+}
+#pairError { display: none; color: #ffb4b4; font-size: 12px; margin-top: 8px; }
+#connInfo { display: none; }
+.kv { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding: 9px 0; border-bottom: 1px dashed var(--line); }
+.kv:last-child { border-bottom: 0; }
+.kv span:first-child { color: var(--muted); }
+.ok-big { color: #8ef0b3; font-weight: 600; }
+
+/* ---------- dock ---------- */
+.dock {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+  background: rgba(13, 16, 21, .93);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.dock-in {
+  max-width: 1140px; margin: 0 auto;
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 16px;
+}
+.dockprog { flex: 1; min-width: 0; }
+.dockbar { height: 4px; background: #1b212a; border-radius: 99px; overflow: hidden; margin-bottom: 6px; }
+.dockbar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--green), var(--green2)); border-radius: 99px; transition: width .25s; }
+.docktext { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.docknext { font-size: 10.5px; color: var(--dim); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dockbtns { display: flex; gap: 8px; flex: none; }
+.dockbtns button { min-width: 96px; }
+
+/* ---------- modal ---------- */
+.modal {
+  position: fixed; inset: 0; z-index: 80;
+  display: none; align-items: center; justify-content: center;
+  padding: 18px; background: rgba(4, 6, 9, .66);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.modal.open { display: flex; }
+.sheet {
+  width: min(640px, 100%); max-height: 86vh; overflow: auto;
+  background: var(--card); border: 1px solid var(--line); border-radius: 20px;
+  padding: 20px; box-shadow: 0 30px 80px rgba(0, 0, 0, .5);
+  animation: sheetIn .18s ease-out;
+}
+@keyframes sheetIn { from { opacity: 0; transform: translateY(10px) scale(.99); } to { opacity: 1; transform: none; } }
+.sheethead { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.bubble {
+  background: var(--bg2); border: 1px solid var(--line);
+  border-radius: 14px 14px 14px 5px;
+  padding: 14px; margin: 0 0 10px;
+  font-family: inherit; font-size: 13px; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-word; color: var(--text);
+}
+.bubble.answer { background: rgba(34, 197, 94, .07); border-color: rgba(34, 197, 94, .32); border-radius: 14px 14px 5px 14px; }
+#fwPreview {
+  background: #07090d; border: 1px solid var(--line); border-radius: 12px;
+  padding: 12px; margin: 10px 0 0;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 12px; max-height: 260px; overflow: auto;
+  white-space: pre-wrap; word-break: break-word;
+}
+
+/* ---------- toasts ---------- */
+.toasts {
+  position: fixed; right: 16px; bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+  z-index: 90; display: flex; flex-direction: column; gap: 8px;
+  max-width: min(380px, calc(100vw - 32px)); pointer-events: none;
+}
+.toast {
+  background: #161c24; border: 1px solid var(--line);
+  border-left: 3px solid var(--green);
+  border-radius: 10px; padding: 10px 14px;
+  font-size: 13px; line-height: 1.45; box-shadow: 0 12px 30px rgba(0, 0, 0, .42);
+  animation: toastIn .18s ease-out;
+}
+.toast.err { border-left-color: var(--red); }
+.toast.warn { border-left-color: var(--amber); }
+.toast.out { opacity: 0; transition: opacity .3s; }
+@keyframes toastIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ---------- small screens ---------- */
+@media (max-width: 700px) {
+  #qrBox { display: none; }
+  #pairBox { margin-top: 0; padding-top: 0; border-top: 0; }
+  .brandsub { display: none; }
+  .hstats .chip.stat { display: none; }
+  .appbar-in { padding: 8px 12px; }
+  .wrap { padding: 14px 12px 24px; }
+  .card { padding: 16px; border-radius: 16px; }
+  h2 { font-size: 14.5px; }
+  .runs .run { grid-template-columns: 1fr auto; gap: 2px 10px; }
+  .runs .when { grid-column: 1 / -1; }
+  .dock-in { padding: 8px 12px; gap: 10px; }
+  .dockbtns button { min-width: 0; padding: 0 12px; }
+  input[type=text], input[type=password], input[type=number], input[type=tel], input[type=search], select { font-size: 16px; }
+}
+@media (max-width: 440px) {
+  /* Keep all four tabs on screen without a sideways scroll. */
+  .tabbar-in { padding: 0 2px; }
+  .tabbtn { padding: 0 5px; gap: 5px; font-size: 12.5px; }
+  .tabbtn svg { width: 15px; height: 15px; }
+  .navbadge { min-width: 16px; height: 16px; padding: 0 4px; font-size: 10px; }
+}
+@media (max-width: 400px) {
+  .brand h1 { font-size: 15px; }
+  .docknext { display: none; }
+  .dockbtns button { font-size: 13px; min-height: 40px; }
+}
+
+</style>
+</head>
+<body>
+<div class="topbar">
+  <header class="appbar">
+    <div class="appbar-in">
+      <div class="brand">
+        <div class="logo">Q</div>
+        <div class="brandtext">
+          <h1>Question Poster</h1>
+          <div class="brandsub">Daily quiz · WhatsApp &amp; Telegram</div>
+        </div>
+      </div>
+      <div class="hspace"></div>
+      <div class="hstats">
+        <span class="chip stat" id="stats">—</span>
+        <span class="chip dry" id="dryBadge" hidden>Dry run</span>
+        <button class="pill disconnected" id="pill" type="button" title="Connection — open System">
+          <span class="dot"></span><span id="pillText">Connecting…</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <nav class="tabbar" aria-label="Sections">
+    <div class="tabbar-in">
+      <button class="tabbtn active" data-goto="post" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z"/></svg>
+        <span>Post</span>
+      </button>
+      <button class="tabbtn" data-goto="channels" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.9 19.1a10 10 0 0 1 0-14.2M7.8 16.2a6 6 0 0 1 0-8.4M12 12h.01M16.2 7.8a6 6 0 0 1 0 8.4M19.1 4.9a10 10 0 0 1 0 14.2"/></svg>
+        <span>Channels</span><span class="navbadge" id="navChannels"></span>
+      </button>
+      <button class="tabbtn" data-goto="automation" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg>
+        <span>Automation</span><i class="navdot" id="navAuto"></i>
+      </button>
+      <button class="tabbtn" data-goto="system" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-6M4 11V3M12 21v-9M12 8V3M20 21v-4M20 13V3"/><path d="M2 15h4M10 8h4M18 17h4"/></svg>
+        <span>System</span>
+      </button>
+    </div>
+  </nav>
+</div>
+
+<main class="wrap">
+
+  <!-- ============ POST ============ -->
+  <section class="tab active" data-tab="post">
+    <div class="grid post-grid">
+
+      <div class="card">
+        <div class="cardhead">
+          <h2><span class="step">1</span>Post questions</h2>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="size">How many questions</label>
+            <input type="number" id="size" min="1" max="200" value="50" inputmode="numeric">
+          </div>
+          <div>
+            <label for="gap">Gap between posts (s)</label>
+            <input type="number" id="gap" min="0" max="600" value="20" inputmode="numeric">
+          </div>
+        </div>
+        <div class="estimate" id="estimate"></div>
+
+        <label style="margin-top:16px">Post format</label>
+        <select id="style" class="hidden-select" tabindex="-1" aria-hidden="true">
+          <option value="quiz">Quiz — tap to answer, tells you right/wrong ✅ (recommended)</option>
+          <option value="poll">Poll — tap to answer, no right answer shown</option>
+          <option value="text">Plain text — A) B) C) D) with "reply with your answer"</option>
+        </select>
+        <div class="radiocards">
+          <label>
+            <input type="radio" name="stylePick" value="quiz">
+            <span><span class="t">Quiz</span><span class="d">Tap to answer. WhatsApp marks it right or wrong — best for engagement.</span></span>
+          </label>
+          <label>
+            <input type="radio" name="stylePick" value="poll">
+            <span><span class="t">Poll</span><span class="d">Tap to answer. Subscribers never see which one was right.</span></span>
+          </label>
+          <label>
+            <input type="radio" name="stylePick" value="text">
+            <span><span class="t">Plain text</span><span class="d">A) B) C) D) with “reply with your answer”.</span></span>
+          </label>
+        </div>
+
+        <div class="check" style="margin-top:12px"><input type="checkbox" id="includeAnswer"><label for="includeAnswer" id="includeAnswerLabel">Post the answer as a separate message after each question</label></div>
+        <div class="check"><input type="checkbox" id="scorePoll"><label for="scorePoll">End with a score poll — subscribers tap their band to tell you their score</label></div>
+
+        <div class="check dryrow"><input type="checkbox" id="dryRun"><label for="dryRun">Dry run — preview only, nothing is sent</label></div>
+
+        <div class="banner" id="banner"></div>
+        <div class="postto" id="postTo">—</div>
+
+        <div class="btnrow">
+          <button class="primary" id="postBtn" type="button">▶ Post now</button>
+          <button id="stopBtn" type="button" disabled>■ Stop</button>
+          <button class="ghost" id="previewBtn" type="button">👁 Preview next</button>
+        </div>
+
+        <div class="bar"><i id="bar"></i></div>
+        <div class="bartext" id="bartext">Idle.</div>
+      </div>
+
+      <div class="card">
+        <div class="cardhead">
+          <h2><span class="step">2</span>What to send</h2>
+          <span class="availchip" id="availChip"></span>
+        </div>
+
+        <label style="margin-bottom:10px">Question mix <span class="pcount" id="mixTotal">All questions</span></label>
+        <div class="presets" id="presetBar">
+          <button class="preset" type="button" data-preset="balanced">⚖️ Balanced 50</button>
+          <button class="preset" type="button" data-preset="each">🔢 10 each subject</button>
+          <button class="preset" type="button" data-preset="maths">➗ Maths + Reasoning</button>
+          <button class="preset" type="button" data-preset="random">🎲 Random 50</button>
+        </div>
+        <div class="quotalist" id="quotaRows"></div>
+        <div class="inline" style="margin-top:8px">
+          <select id="quotaAdd" aria-label="Add a subject to the mix"></select>
+          <button class="small ghost" id="quotaClear" type="button" hidden>Clear mix</button>
+        </div>
+        <div class="seg" id="quotaOrderSeg" style="margin-top:10px" hidden>
+          <label><input type="radio" name="quotaOrderPick" value="grouped" checked><span>Subject blocks</span></label>
+          <label><input type="radio" name="quotaOrderPick" value="mixed"><span>Mixed</span></label>
+        </div>
+        <div class="mixnote" id="mixNote" hidden>
+          A mix replaces the module and subtopic filters below. Questions already sent to this channel are skipped.
+        </div>
+
+        <hr class="hr">
+
+        <label>Order</label>
+        <select id="order" class="hidden-select" tabindex="-1" aria-hidden="true">
+          <option value="sequence">Sequence — carry on where we left off</option>
+          <option value="random">Random test — shuffle them (still no repeats)</option>
+        </select>
+        <div class="seg">
+          <label><input type="radio" name="orderPick" value="sequence" checked><span>Sequence</span></label>
+          <label><input type="radio" name="orderPick" value="random"><span>Random test</span></label>
+        </div>
+        <div class="hint" id="orderHint">Carries on where the last run stopped — no repeats.</div>
+
+        <div class="pickerbox" style="margin-top:16px">
+          <div class="plabel"><label for="moduleSearch">Modules</label><span class="pcount" id="moduleCount">All</span></div>
+          <input type="search" id="moduleSearch" placeholder="Search modules…" autocomplete="off">
+          <select id="modules" multiple class="hidden-select" tabindex="-1" aria-hidden="true"></select>
+          <div class="picker" id="modulePicker"></div>
+        </div>
+
+        <div class="pickerbox" style="margin-top:14px">
+          <div class="plabel"><label for="subSearch">Subtopics</label><span class="pcount" id="subCount">All</span></div>
+          <input type="search" id="subSearch" placeholder="Search subtopics…" autocomplete="off">
+          <select id="subtopics" multiple class="hidden-select" tabindex="-1" aria-hidden="true"></select>
+          <div class="picker" id="subPicker"></div>
+        </div>
+
+        <div class="btnrow" style="margin-top:12px">
+          <button class="small ghost" id="clearFilterBtn" type="button">Clear selection — use everything</button>
+        </div>
+        <div class="avail" id="avail">—</div>
+        <div class="hint">Nothing selected = every question. A subtopic on its own is enough,
+          e.g. pick <b>Chemistry &amp; Environment</b> and set the count to 25 for a chemistry-only test.</div>
+      </div>
+    </div>
+
+    <div class="card logcard">
+      <div class="cardhead">
+        <h2>Live log</h2>
+        <div class="hspace"></div>
+        <select id="logFilter" class="tinyselect" aria-label="Log level">
+          <option value="all">All</option>
+          <option value="info">Info</option>
+          <option value="warn">Warnings</option>
+          <option value="err">Errors</option>
+        </select>
+        <button class="small ghost" id="logClear" type="button">Clear</button>
+      </div>
+      <div class="log" id="log" role="log" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- ============ CHANNELS ============ -->
+  <section class="tab" data-tab="channels">
+    <div class="grid two">
+      <div class="card">
+        <div class="cardhead">
+          <h2><span class="step">3</span>Send to</h2>
+          <span class="availchip" id="targetCount"></span>
+        </div>
+        <div id="targets"><div class="empty">Loading…</div></div>
+
+        <div class="subcard">
+          <label for="resolveLink">Add a WhatsApp channel</label>
+          <div class="inline">
+            <input type="text" id="resolveLink" placeholder="https://whatsapp.com/channel/0029V…">
+            <button id="addChannelBtn" type="button">＋ Add</button>
+          </div>
+          <div class="hint">Paste the channel invite link. You must be its owner or admin.</div>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="card">
+          <div class="cardhead"><h2>Telegram</h2></div>
+          <div class="check"><input type="checkbox" id="tgEnabled"><label for="tgEnabled">Also post to Telegram</label></div>
+          <label for="tgToken">Bot token</label>
+          <input type="password" id="tgToken" placeholder="123456789:AAE…" autocomplete="off">
+          <div class="btnrow">
+            <button id="tgSaveBtn" type="button">Save token</button>
+            <button id="tgFindBtn" type="button">🔍 Find channels</button>
+          </div>
+          <div class="hint">Create a bot with <b>@BotFather</b>, add it to the channel as an <b>admin</b>
+            with “Post messages”, then click <b>Find channels</b>.</div>
+        </div>
+
+        <div class="card">
+          <div class="cardhead"><h2>Repost one question</h2></div>
+          <div class="inline">
+            <input type="number" id="repostPos" min="1" placeholder="No. e.g. 40" inputmode="numeric" style="max-width:130px;flex:none;width:130px">
+            <select id="repostTarget"></select>
+            <button id="repostBtn" type="button">↻ Repost</button>
+          </div>
+          <div class="hint">Uses the number in the last run's header (<b>Q40</b> = the 40th question of
+            that run). Use it when a post never arrived.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ AUTOMATION ============ -->
+  <section class="tab" data-tab="automation">
+    <div class="grid two">
+      <div class="card">
+        <div class="cardhead">
+          <h2><span class="step">5</span>Post automatically</h2>
+          <span class="chip" id="schBadge" hidden>On</span>
+        </div>
+
+        <div class="check"><input type="checkbox" id="schEnabled"><label for="schEnabled">Start a run on its own at these times</label></div>
+
+        <label for="schTimes">Times — 24-hour, comma separated</label>
+        <input type="text" id="schTimes" placeholder="08:00, 20:00" autocomplete="off">
+
+        <div class="row" style="margin-top:12px">
+          <div>
+            <label for="schSize">Questions per run</label>
+            <input type="number" id="schSize" min="0" max="200" value="0" inputmode="numeric">
+          </div>
+          <div>
+            <label for="schGap">Gap (s, blank = card 1)</label>
+            <input type="number" id="schGap" min="-1" max="600" value="-1" inputmode="numeric">
+          </div>
+        </div>
+
+        <label style="margin-top:14px">Days</label>
+        <div class="dayrow" id="schDays"></div>
+
+        <div class="btnrow">
+          <button class="primary" id="schSaveBtn" type="button">Save schedule</button>
+        </div>
+        <div class="status" id="schStatus">Off.</div>
+        <div class="hint">Uses the channels ticked in <b>3 · Send to</b>. A missed time is
+          skipped, never replayed late, and each slot fires once per day.</div>
+      </div>
+
+      <div class="card">
+        <div class="cardhead">
+          <h2><span class="step">4</span>Forward a news channel</h2>
+          <span class="chip" id="fwBadge" hidden>On</span>
+        </div>
+
+        <div class="check"><input type="checkbox" id="fwEnabled"><label for="fwEnabled">Send a digest every hour</label></div>
+
+        <label>Source channels — the news you copy from</label>
+        <div id="fwSources"><div class="empty">No source yet.</div></div>
+        <div class="inline" style="margin-top:8px">
+          <input type="text" id="fwLink" placeholder="https://whatsapp.com/channel/0029V…">
+          <button id="fwAddBtn" type="button">＋ Add source</button>
+        </div>
+
+        <div class="subcard">
+          <label>Post the digest to</label>
+          <div id="fwTargets"><div class="hint">Loading…</div></div>
+        </div>
+
+        <div class="row" style="margin-top:12px">
+          <div><label for="fwInterval">Every (min)</label><input type="number" id="fwInterval" min="5" max="1440" value="60" inputmode="numeric"></div>
+          <div><label for="fwMax">Max messages</label><input type="number" id="fwMax" min="1" max="100" value="20" inputmode="numeric"></div>
+          <div><label for="fwGap">Gap (s)</label><input type="number" id="fwGap" min="0" max="60" value="3" inputmode="numeric"></div>
+        </div>
+
+        <label style="margin-top:12px" for="fwKeywords">Only messages containing</label>
+        <input type="text" id="fwKeywords" placeholder="haryana, hssc, result" autocomplete="off">
+        <label style="margin-top:10px" for="fwBlocked">Never send messages containing</label>
+        <input type="text" id="fwBlocked" placeholder="advertisement, join group" autocomplete="off">
+
+        <div class="check"><input type="checkbox" id="fwHeader" checked><label for="fwHeader">Add a “📰 … — 5 updates” header</label></div>
+        <div class="check"><input type="checkbox" id="fwDry"><label for="fwDry">Dry run — preview only, send nothing</label></div>
+
+        <div class="btnrow">
+          <button id="fwSaveBtn" type="button">Save forwarder</button>
+          <button class="ghost" id="fwPreviewBtn" type="button">👁 Preview last hour</button>
+          <button class="ghost" id="fwNowBtn" type="button">📤 Forward now</button>
+        </div>
+        <div class="status" id="fwStatus">Off.</div>
+        <pre id="fwPreview" style="display:none"></pre>
+        <div class="hint">Copies text posts only. A picture with a caption is posted as its
+          caption; a picture with no text is skipped. The linked account must follow the
+          source channel.</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="cardhead"><h2>Recent runs</h2></div>
+      <div id="runsBox"><div class="empty">No run recorded yet.</div></div>
+    </div>
+  </section>
+
+  <!-- ============ SYSTEM ============ -->
+  <section class="tab" data-tab="system">
+    <div class="grid two">
+      <div class="card" id="connCard">
+        <div class="cardhead"><h2>WhatsApp connection</h2></div>
+        <div id="qrBox">
+          <div class="hint" id="connHint" style="margin-top:0">Starting up…</div>
+          <img id="qrImg" style="display:none" alt="QR code">
+          <div class="hint" id="qrHint" style="display:none">Open WhatsApp → <b>Linked Devices</b> → Link a device, then scan this.</div>
+        </div>
+        <div id="pairBox">
+          <div class="hint" style="margin-top:0"><b>On a phone?</b> Link with a code — you cannot scan a QR shown on the same screen.</div>
+          <div class="pairrow">
+            <input id="pairPhone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="919812345678 (country code, no +)">
+            <button id="pairBtn" type="button">🔗 Get code</button>
+          </div>
+          <div id="pairCodeBox">
+            <div class="hint">WhatsApp → <b>Linked Devices</b> → <b>Link with phone number</b>, then type:</div>
+            <div id="pairCode">—</div>
+          </div>
+          <div class="hint" id="pairError"></div>
+        </div>
+        <div id="connInfo">
+          <div class="kv"><span>Status</span><span class="ok-big">Connected</span></div>
+          <div class="kv"><span>Account</span><span id="meValue">—</span></div>
+        </div>
+        <div class="btnrow">
+          <button id="reconnectBtn" type="button">🔄 Reconnect</button>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="card">
+          <div class="cardhead"><h2>At a glance</h2></div>
+          <div class="kv"><span>WhatsApp</span><span id="sysWa">—</span></div>
+          <div class="kv"><span>Channels</span><span id="sysChannels">—</span></div>
+          <div class="kv"><span>Progress</span><span id="sysQuestions">—</span></div>
+          <div class="kv"><span>Automatic runs</span><span id="sysSchedule">—</span></div>
+          <div class="kv"><span>Next run</span><span id="sysNext">—</span></div>
+        </div>
+
+        <div class="card">
+          <div class="cardhead"><h2>Danger zone</h2></div>
+          <div class="btnrow" style="margin-top:0">
+            <button class="danger" id="unlinkBtn" type="button">🔌 Re-link WhatsApp</button>
+            <button class="danger" id="resetBtn" type="button">Reset progress</button>
+          </div>
+          <div class="hint"><b>Re-link</b> deletes the saved session and shows a fresh QR (use it if you
+            keep seeing “440”). <b>Reset progress</b> makes every question available again, on every channel.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="dock">
+  <div class="dock-in">
+    <div class="dockprog">
+      <div class="dockbar"><i id="dockBar"></i></div>
+      <div class="docktext" id="dockText" title="Open the live log">Idle.</div>
+      <div class="docknext" id="dockNext"></div>
+    </div>
+    <div class="dockbtns">
+      <button id="dockStop" type="button" disabled>■ Stop</button>
+      <button class="primary" id="dockPost" type="button">▶ Post now</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="previewModal" role="dialog" aria-modal="true" aria-label="Preview next question">
+  <div class="sheet">
+    <div class="sheethead">
+      <h3>Next question</h3>
+      <button class="iconbtn" id="previewClose" type="button" aria-label="Close">✕</button>
+    </div>
+    <pre class="bubble" id="previewQ" style="display:none"></pre>
+    <pre class="bubble answer" id="previewA" style="display:none"></pre>
+    <div class="hint" id="previewHint" style="margin-top:0">Click “Preview next” to see what will be posted.</div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const post = async (p, body) => {
+  const r = await fetch(p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  return r.json();
+};
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// ---- small UI helpers -------------------------------------------------
+
+/** A short confirmation that does not depend on which card is on screen. */
+function toast(text, kind = 'ok') {
+  const box = $('toasts');
+  if (!box || !text) return;
+  const el = document.createElement('div');
+  el.className = 'toast ' + kind;
+  el.textContent = text;
+  box.appendChild(el);
+  setTimeout(() => el.classList.add('out'), 3800);
+  setTimeout(() => el.remove(), 4300);
+}
+
+function humanDur(ms) {
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 60) return `${s}s`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m} min`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
+function humanGap(ms) {
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  return `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
+/** "50 questions · 20s gap ≈ 17 min" — answers "how long will this take?". */
+function renderEstimate() {
+  const n = Number($('size').value) || 0;
+  const g = Number($('gap').value) || 0;
+  const ms = Math.max(0, n - 1) * g * 1000;
+  $('estimate').textContent = n
+    ? `${n} question${n === 1 ? '' : 's'} · ${g}s gap ≈ ${humanDur(ms)}`
+    : '';
+}
+
+/** Everything in the header, the nav counters and the System summary. */
+function renderChrome(s) {
+  const on = (s.targets ?? []).filter((t) => t.enabled);
+  const first = on[0];
+  $('stats').innerHTML = first
+    ? `<b>${on.length}</b> channel${on.length > 1 ? 's' : ''} · <b>${(first.covered ?? 0).toLocaleString()}</b>/${(first.total ?? 0).toLocaleString()} sent`
+    : 'No channel selected';
+
+  $('dryBadge').hidden = !s.config?.dryRun;
+
+  $('postTo').innerHTML = on.length
+    ? `<span class="dotlive"></span> Will post to <b>${on.map((t) => esc(t.label)).join(' + ')}</b>`
+    : '<span style="color:#fcd34d">No channel selected</span> — open Channels';
+
+  $('targetCount').textContent = s.targets?.length
+    ? `${on.length} of ${s.targets.length} on`
+    : '';
+
+  $('navChannels').textContent = on.length ? String(on.length) : '';
+  $('navAuto').classList.toggle('on', !!s.schedule?.enabled);
+
+  const statusWords = {
+    connected: 'Connected',
+    connecting: 'Connecting…',
+    awaiting_qr: 'Waiting to link',
+    disconnected: 'Disconnected',
+    logged_out: 'Logged out',
+  };
+  $('sysWa').textContent = statusWords[s.status] ?? s.status;
+  $('sysChannels').textContent = `${s.targets?.length ?? 0} added, ${on.length} on`;
+  $('sysQuestions').textContent = first
+    ? `${(first.covered ?? 0).toLocaleString()} / ${(first.total ?? 0).toLocaleString()} sent`
+    : '—';
+  $('sysSchedule').textContent = s.schedule?.enabled
+    ? `${(s.schedule.times ?? []).join(', ')} · ${(s.schedule.weekdays ?? []).length ? 'selected days' : 'every day'}`
+    : 'Off';
+}
+
+let configLoaded = false;
+let planned = 0;
+let topics = { modules: [], subtopics: [], total: 0, covered: 0, available: 0 };
+let activeTarget = '';
+let current = { status: 'disconnected', running: false, channelValid: false, targets: [], config: { dryRun: false, batch: {}, channels: [], telegram: { chats: [] } } };
+
+function settingsFromForm() {
+  return {
+    dryRun: $('dryRun').checked,
+    selection: {
+      modules: [...$('modules').selectedOptions].map((o) => o.value),
+      subtopics: [...$('subtopics').selectedOptions].map((o) => o.value),
+      mode: $('order').value,
+    },
+    batch: {
+      size: Number($('size').value),
+      gapSeconds: Number($('gap').value),
+      includeAnswer: $('includeAnswer').checked,
+      scorePoll: $('scorePoll').checked,
+      style: $('style').value,
+    },
+  };
+}
+
+/** A quiz reveals the answer itself, so the separate answer post is pointless. */
+function syncAnswerCheckbox() {
+  const isQuiz = $('style').value === 'quiz';
+  const box = $('includeAnswer');
+  if (isQuiz) box.checked = false;
+  box.disabled = isQuiz;
+  $('includeAnswerLabel').textContent = isQuiz
+    ? 'Post the answer as a separate message — not needed for a quiz, it shows the answer itself'
+    : 'Post the answer as a separate message after each question';
+}
+
+function setPill(status) {
+  const pill = $('pill');
+  pill.className = 'pill ' + status;
+  const labels = {
+    connected: 'Connected',
+    connecting: 'Connecting…',
+    awaiting_qr: 'Scan QR to link',
+    disconnected: 'Disconnected',
+    logged_out: 'Logged out',
+  };
+  $('pillText').textContent = labels[status] || status;
+}
+
+function renderTargets(s) {
+  const box = $('targets');
+  if (!s.targets.length) {
+    box.innerHTML = '<div class="empty">No channel yet. Add a WhatsApp channel below, or set up Telegram.</div>';
+    return;
+  }
+  box.innerHTML = s.targets.map((t) => {
+    const kind = t.kind === 'telegram' ? 'tg' : 'wa';
+    const id = t.kind === 'telegram' ? t.chatId : t.jid;
+    const pct = t.total ? Math.round((t.covered / t.total) * 100) : 0;
+    return `<div class="target">
+      <input type="checkbox" data-key="${esc(t.key)}" ${t.enabled ? 'checked' : ''} aria-label="Post to ${esc(t.label)}">
+      <div class="tinfo">
+        <div class="tname"><span class="tag ${kind}">${t.kind === 'telegram' ? 'Telegram' : 'WhatsApp'}</span><span>${esc(t.label)}</span></div>
+        <div class="tsub">${esc(id)} · ${t.covered}/${t.total} sent (${pct}%)</div>
+        <div class="tprog"><i style="width:${pct}%"></i></div>
+      </div>
+      <button class="small" data-test="${esc(t.key)}">Test</button>
+      <button class="iconbtn" data-remove="${esc(t.key)}" title="Remove">✕</button>
+    </div>`;
+  }).join('');
+
+  box.querySelectorAll('input[data-key]').forEach((el) => {
+    el.onchange = () => toggleTarget(el.dataset.key, el.checked);
+  });
+  box.querySelectorAll('button[data-test]').forEach((el) => {
+    el.onclick = async () => {
+      el.disabled = true;
+      el.textContent = '…';
+      const r = await post('/api/target/test', { key: el.dataset.test });
+      el.textContent = 'Test';
+      el.disabled = false;
+      toast(r.error ? r.error : 'Test message sent ✅', r.error ? 'err' : 'ok');
+    };
+  });
+  box.querySelectorAll('button[data-remove]').forEach((el) => {
+    el.onclick = async () => {
+      const key = el.dataset.remove;
+      if (!confirm('Remove this channel from the list? Its progress stays saved.')) return;
+      if (key.startsWith('wa:')) await post('/api/channels/remove', { jid: key.slice(3) });
+      else {
+        const chats = (current.config.telegram?.chats ?? []).filter((c) => `tg:${c.chatId}` !== key);
+        await post('/api/settings', { telegram: { ...current.config.telegram, chats } });
+      }
+    };
+  });
+
+  // Repost picker: keep the current choice if it still exists.
+  const picker = $('repostTarget');
+  const keep = picker.value;
+  picker.innerHTML = s.targets
+    .map((t) => `<option value="${esc(t.key)}">${esc(t.label)}${t.enabled ? '' : ' (off)'}</option>`)
+    .join('');
+  if (keep && s.targets.some((t) => t.key === keep)) picker.value = keep;
+  else {
+    const firstEnabled = s.targets.find((t) => t.enabled);
+    if (firstEnabled) picker.value = firstEnabled.key;
+  }
+}
+
+function fwSettingsFromForm() {
+  return {
+    enabled: $('fwEnabled').checked,
+    intervalMinutes: Number($('fwInterval').value) || 60,
+    maxPerRun: Number($('fwMax').value) || 20,
+    gapSeconds: Number($('fwGap').value) || 0,
+    header: $('fwHeader').checked,
+    dryRun: $('fwDry').checked,
+    keywords: $('fwKeywords').value.split(',').map((w) => w.trim()).filter(Boolean),
+    blocked: $('fwBlocked').value.split(',').map((w) => w.trim()).filter(Boolean),
+    sources: (current.forward?.sources ?? current.config?.forwarder?.sources ?? [])
+      .map((s) => ({ jid: s.jid, name: s.name, enabled: s.enabled !== false })),
+    targets: [...document.querySelectorAll('[data-fwtarget]')].filter((el) => el.checked).map((el) => el.dataset.fwtarget),
+  };
+}
+
+function renderForward(s) {
+  const fw = s.forward || { sources: [], targetKeys: [] };
+  $('fwBadge').hidden = !fw.enabled;
+  const box = $('fwSources');
+  if (!fw.sources?.length) {
+    box.innerHTML = '<div class="empty">No source yet — paste the news channel link below.</div>';
+  } else {
+    box.innerHTML = fw.sources.map((src) => `
+      <div class="target">
+        <input type="checkbox" data-fwsrc="${esc(src.jid)}" ${src.enabled !== false ? 'checked' : ''}>
+        <div class="tinfo">
+          <div class="tname">${esc(src.name || src.jid)}</div>
+          <div class="tsub">${src.lastAt
+            ? `last digest ${new Date(src.lastAt).toLocaleString()} · ${src.lastCount ?? 0} message(s)`
+            : 'no digest yet'}</div>
+        </div>
+        <button class="small danger" data-fwremove="${esc(src.jid)}">✕</button>
+      </div>`).join('');
+  }
+
+  box.querySelectorAll('input[data-fwsrc]').forEach((el) => {
+    el.onchange = async () => {
+      const sources = (current.forward?.sources ?? []).map((src) =>
+        (src.jid === el.dataset.fwsrc ? { ...src, enabled: el.checked } : { ...src }));
+      await post('/api/settings', {
+        forwarder: { ...fwSettingsFromForm(), sources: sources.map((src) => ({ jid: src.jid, name: src.name, enabled: src.enabled })) },
+      });
+    };
+  });
+  box.querySelectorAll('button[data-fwremove]').forEach((el) => {
+    el.onclick = async () => {
+      if (!confirm('Remove this news source?')) return;
+      await post('/api/forward/source/remove', { jid: el.dataset.fwremove });
+    };
+  });
+
+  const tbox = $('fwTargets');
+  const chosen = new Set(fw.targetKeys ?? []);
+  if (!s.targets?.length) {
+    tbox.innerHTML = '<div class="hint">No channel yet — add one under "3 · Send to".</div>';
+  } else {
+    tbox.innerHTML = s.targets.map((t) => `
+      <label class="check" style="margin:4px 0">
+        <input type="checkbox" data-fwtarget="${esc(t.key)}" ${chosen.has(t.key) ? 'checked' : ''}>
+        <span style="margin-left:8px">${esc(t.label)}</span>
+      </label>`).join('');
+  }
+  tbox.querySelectorAll('input[data-fwtarget]').forEach((el) => {
+    el.onchange = async () => {
+      await post('/api/settings', { forwarder: fwSettingsFromForm() });
+    };
+  });
+
+  $('fwStatus').textContent = fw.enabled
+    ? `On — every ${fw.intervalMinutes} min, up to ${fw.maxPerRun} messages${fw.dryRun ? ' (dry run)' : ''}.${fw.lastRun
+      ? ` Last run: ${fw.lastRun.sent} sent at ${new Date(fw.lastRun.at).toLocaleTimeString()}.`
+      : ''}`
+    : 'Off.';
+}
+
+// ---- automatic schedule
+
+const DAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+let scheduleFormLoaded = false;
+
+function scheduleFromForm() {
+  return {
+    enabled: $('schEnabled').checked,
+    times: $('schTimes').value.split(',').map((t) => t.trim()).filter(Boolean),
+    size: Number($('schSize').value) || 0,
+    gapSeconds: $('schGap').value === '' ? -1 : Number($('schGap').value),
+    weekdays: [...document.querySelectorAll('[data-schday]')]
+      .filter((el) => el.checked)
+      .map((el) => Number(el.dataset.schday)),
+  };
+}
+
+function renderSchedule(s) {
+  const sch = s.schedule ?? {};
+  const box = $('schDays');
+  if (!box.children.length) {
+    box.innerHTML = DAY_LETTERS.map((letter, i) =>
+      `<label title="${DAY_NAMES[i]}"><input type="checkbox" data-schday="${i}"><span>${letter}</span></label>`).join('');
+  }
+
+  if (!scheduleFormLoaded) {
+    $('schEnabled').checked = sch.enabled === true;
+    $('schTimes').value = (sch.times ?? []).join(', ');
+    $('schSize').value = sch.size ?? 0;
+    $('schGap').value = sch.gapSeconds ?? -1;
+    const chosen = new Set(sch.weekdays ?? []);
+    box.querySelectorAll('input[data-schday]').forEach((el) => {
+      el.checked = chosen.has(Number(el.dataset.schday));
+    });
+    scheduleFormLoaded = true;
+  }
+
+  $('schBadge').hidden = !sch.enabled;
+
+  if (!sch.enabled) {
+    $('schStatus').innerHTML = 'Off — runs only when you press <b>Post now</b>.';
+    return;
+  }
+
+  const days = (sch.weekdays ?? []).length
+    ? sch.weekdays.slice().sort().map((d) => DAY_NAMES[d].slice(0, 3)).join(', ')
+    : 'every day';
+  const size = sch.size > 0 ? `, ${sch.size} questions` : '';
+  const next = sch.nextAt ? new Date(sch.nextAt) : null;
+  $('schStatus').innerHTML = `On — ${esc(days)} at <b>${esc((sch.times ?? []).join(', '))}</b>${esc(size)}.`
+    + (next
+      ? `<span class="nextrun">Next ${esc(next.toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' }))} · in <b id="schNextIn">—</b></span>`
+      : '');
+  tick();
+}
+
+function renderRuns(s) {
+  const runs = s.runs ?? [];
+  const box = $('runsBox');
+  if (!runs.length) {
+    box.innerHTML = '<div class="empty">No run recorded yet.</div>';
+    return;
+  }
+  box.innerHTML = `<div class="runs">${runs.map((r) => {
+    const when = new Date(r.at).toLocaleString(undefined, {
+      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+    const len = r.ms ? ` · ${humanDur(r.ms)}` : '';
+    const bits = [];
+    if (r.finished) bits.push('nothing left');
+    else bits.push(`${r.sent ?? 0} sent`);
+    if (r.failed) bits.push(`${r.failed} failed`);
+    if (r.stopped) bits.push('stopped');
+    if (r.summaryError) bits.push('closing failed');
+    const title = r.total ? `${r.covered ?? 0}/${r.total} covered` : '';
+    return `<div class="run" title="${esc(title)}">
+      <span class="when">${esc(when)}</span>
+      <span class="what">${esc(r.label || r.targetKey || '')}${r.reason === 'schedule' ? '<span class="mini auto">auto</span>' : ''}${(r.failed ?? 0) > 0 ? '<span class="mini bad">fail</span>' : ''}</span>
+      <span class="num ${(r.failed ?? 0) > 0 ? 'bad' : ''}">${esc(bits.join(', '))}${esc(len)}</span>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+async function toggleTarget(key, enabled) {
+  const channels = (current.config.channels ?? []).map((c) => ({ jid: c.jid, name: c.name, enabled: c.enabled }));
+  const chats = (current.config.telegram?.chats ?? []).map((c) => ({ ...c }));
+  for (const c of channels) if (`wa:${c.jid}` === key) c.enabled = enabled;
+  for (const c of chats) if (`tg:${c.chatId}` === key) c.enabled = enabled;
+  await post('/api/settings', { channels, telegram: { ...current.config.telegram, chats } });
+}
+
+function fillSelect(el, list, selected, qualify) {
+  const chosen = new Set(selected ?? []);
+  el.innerHTML = list.map((item) => {
+    const value = item.name ?? item;
+    return `<option value="${esc(value)}"${chosen.has(value) ? ' selected' : ''}>${esc(qualify ? qualify(item) : value)}</option>`;
+  }).join('');
+}
+
+function updateAvail() {
+  const n = topics.available ?? 0;
+  const target = current.targets.find((t) => t.key === activeTarget);
+  const where = target ? target.label : 'this channel';
+  $('availChip').textContent = `${n.toLocaleString()} left`;
+  if (!$('modules').selectedOptions.length && !$('subtopics').selectedOptions.length) {
+    $('avail').innerHTML = `<b>${n}</b> questions still unsent to ${esc(where)}.`;
+  } else {
+    $('avail').innerHTML = `<b>${n}</b> questions match your selection and are still unsent to ${esc(where)}.`;
+  }
+}
+
+let topicsTimer = null;
+let topicsLoaded = false;
+async function refreshTopics() {
+  clearTimeout(topicsTimer);
+  topicsTimer = setTimeout(async () => {
+    const r = await post('/api/topics', {
+      target: activeTarget,
+      selection: {
+        modules: [...$('modules').selectedOptions].map((o) => o.value),
+        subtopics: [...$('subtopics').selectedOptions].map((o) => o.value),
+      },
+    });
+    if (r.error) return;
+    const keepMods = [...$('modules').selectedOptions].map((o) => o.value);
+    const keepSubs = [...$('subtopics').selectedOptions].map((o) => o.value);
+    topics = r;
+    fillSelect($('modules'), r.modules, keepMods, (m) => `${m.name}  -  ${m.unsent}/${m.total} left`);
+    fillSelect($('subtopics'), r.subtopics.filter((s) => s.name), keepSubs, (s) => `${s.name}  -  ${s.unsent}/${s.total} left`);
+    syncPickers();
+    updateAvail();
+  }, topicsLoaded ? 120 : 0);
+  topicsLoaded = true;
+}
+
+function renderPairing(s) {
+  const code = s.pairingCode || '';
+  $('pairCodeBox').style.display = code ? 'block' : 'none';
+  if (code) $('pairCode').textContent = code.replace(/^(.{4})(.{4})$/, '$1-$2');
+  const err = s.pairingError || '';
+  $('pairError').style.display = err ? 'block' : 'none';
+  if (err) $('pairError').textContent = err;
+  // A QR code is useless on the device that is showing it.
+  if (code) {
+    $('qrImg').style.display = 'none';
+    $('qrHint').style.display = 'none';
+  }
+}
+
+function applyStatus(s) {
+  current = { ...current, ...s };
+  setPill(s.status);
+  renderChrome(s);
+
+  // Follow the first enabled target for the "left" counters.
+  const first = s.targets.find((t) => t.enabled);
+  if (first && (!activeTarget || !s.targets.some((t) => t.key === activeTarget && t.enabled))) {
+    activeTarget = first.key;
+    refreshTopics();
+  }
+
+  renderTargets(s);
+  renderForward(s);
+  renderSchedule(s);
+  renderRuns(s);
+
+  if (s.status === 'connected') {
+    $('connHint').style.display = 'none';
+    $('qrImg').style.display = 'none';
+    $('qrHint').style.display = 'none';
+    $('connInfo').style.display = 'block';
+    $('meValue').textContent = (s.me || '').replace(/:\d+@.*/, '') || '—';
+  } else if (s.qr) {
+    $('connHint').style.display = 'none';
+    $('qrImg').style.display = 'inline-block';
+    $('qrImg').src = s.qr;
+    $('qrHint').style.display = 'block';
+    $('connInfo').style.display = 'none';
+  } else {
+    $('connInfo').style.display = 'none';
+    $('qrImg').style.display = 'none';
+    $('qrHint').style.display = 'none';
+    $('connHint').style.display = 'block';
+    $('connHint').textContent = s.status === 'logged_out'
+      ? 'Logged out — click "Re-link WhatsApp" below to scan a fresh QR.'
+      : 'Starting up…';
+  }
+
+  renderPairing(s);
+
+  if (!configLoaded && s.config) {
+    $('size').value = s.config.batch.size ?? 50;
+    $('gap').value = s.config.batch.gapSeconds ?? 20;
+    $('includeAnswer').checked = s.config.batch.includeAnswer !== false;
+    $('scorePoll').checked = s.config.batch.scorePoll !== false;
+    $('style').value = s.config.batch.style ?? 'quiz';
+    $('order').value = s.config.selection?.mode ?? 'sequence';
+    $('dryRun').checked = !!s.config.dryRun;
+    $('tgEnabled').checked = s.config.telegram?.enabled === true;
+    $('tgToken').value = s.config.telegram?.botToken ?? '';
+    const fw = s.config.forwarder ?? {};
+    $('fwEnabled').checked = fw.enabled === true;
+    $('fwInterval').value = fw.intervalMinutes ?? 60;
+    $('fwMax').value = fw.maxPerRun ?? 20;
+    $('fwGap').value = fw.gapSeconds ?? 3;
+    $('fwKeywords').value = (fw.keywords ?? []).join(', ');
+    $('fwBlocked').value = (fw.blocked ?? []).join(', ');
+    $('fwHeader').checked = fw.header !== false;
+    $('fwDry').checked = fw.dryRun === true;
+    if (s.config.phoneNumber) $('pairPhone').value = s.config.phoneNumber;
+    syncAnswerCheckbox();
+    syncStyleRadios();
+    syncOrderRadios();
+    renderEstimate();
+    configLoaded = true;
+    refreshTopics();
+  }
+
+  updateBanner(s);
+  refreshButtons();
+  tick();
+}
+
+function updateBanner(s) {
+  const b = $('banner');
+  b.className = 'banner show';
+  if (!s.channelValid) {
+    b.classList.add('bad');
+    b.innerHTML = '⛔ ' + esc(s.channelError || 'No channel selected.') + '<br>Open <b>Channels</b> to tick one.';
+  } else if (s.status === 'logged_out') {
+    b.classList.add('bad');
+    b.innerHTML = '⛔ Logged out. Open <b>System → Re-link WhatsApp</b>.';
+  } else if (s.status !== 'connected' && !s.config.dryRun) {
+    b.classList.add('warn');
+    b.innerHTML = '⏳ Connecting to WhatsApp… if asked, link it in <b>System</b>.';
+  } else if (s.running) {
+    b.classList.add('good');
+    b.innerHTML = '📤 Posting…';
+  } else {
+    b.classList.add('good');
+    b.innerHTML = `✅ Ready — ${s.usable} channel${s.usable > 1 ? 's' : ''} selected`;
+  }
+}
+
+function refreshButtons() {
+  const canPost = current.channelValid && !current.running
+    && (current.status === 'connected' || current.config?.dryRun);
+  $('postBtn').disabled = !canPost;
+  $('stopBtn').disabled = !current.running;
+  $('postBtn').textContent = current.running ? '⏳ Posting…' : '▶ Post now';
+  mirrorDock();
+}
+
+const logEntries = [];
+
+function logLevel(level) {
+  return level === 'err' ? 'err' : level === 'warn' ? 'warn' : 'info';
+}
+
+function logMatches(entry) {
+  const filter = $('logFilter')?.value ?? 'all';
+  return filter === 'all' || logLevel(entry.level) === filter;
+}
+
+function appendLog(entry) {
+  const box = $('log');
+  if (!box) return;
+  const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+  const line = document.createElement('div');
+  line.className = 'l lg-' + entry.level;
+  const stamp = document.createElement('span');
+  stamp.className = 'lt';
+  stamp.textContent = new Date(entry.t).toLocaleTimeString(undefined, { hour12: false });
+  const text = document.createElement('span');
+  text.textContent = entry.text;
+  line.append(stamp, text);
+  box.appendChild(line);
+  while (box.childElementCount > 400) box.removeChild(box.firstChild);
+  if (nearBottom) box.scrollTop = box.scrollHeight;
+}
+
+function renderLog() {
+  $('log').innerHTML = '';
+  for (const entry of logEntries) if (logMatches(entry)) appendLog(entry);
+}
+
+function addLog(entry) {
+  logEntries.push(entry);
+  if (logEntries.length > 400) logEntries.shift();
+  if (logMatches(entry)) appendLog(entry);
+}
+
+function onProgress(e) {
+  if (e.type === 'targetStart') {
+    planned = 0;
+    $('bar').style.width = '0%';
+    $('bartext').textContent = `Channel ${e.index}/${e.total} — ${e.label}`;
+  } else if (e.type === 'batchStart') {
+    planned = e.planned;
+    $('bar').style.width = '0%';
+    $('bartext').textContent = `Posting 0 / ${planned}…`;
+  } else if (e.type === 'intro') {
+    $('bartext').textContent = `Intro sent…`;
+  } else if (e.type === 'sent') {
+    const pct = planned ? (e.index / planned) * 100 : 0;
+    $('bar').style.width = pct + '%';
+    $('bartext').textContent = `Posting ${e.index} / ${planned} — ${e.module}`
+      + (e.unconfirmed ? ` — ⚠️ Q${e.number} not confirmed, repost it afterwards` : '');
+  } else if (e.type === 'postFailed') {
+    $('bartext').textContent = `Question ${e.index} failed: ${e.message}`;
+  } else if (e.type === 'postFailedStop') {
+    $('bartext').textContent = e.message;
+  } else if (e.type === 'summary') {
+    $('bartext').textContent = e.mode === 'poll'
+      ? 'Score poll posted — subscribers can tap their band.'
+      : 'Summary posted.';
+  } else if (e.type === 'summaryFailed') {
+    $('bartext').textContent = '⚠️ The closing message failed: ' + e.message;
+    toast('Closing message failed: ' + e.message, 'warn');
+  } else if (e.type === 'batchEnd') {
+    $('bar').style.width = '100%';
+    $('bartext').textContent = `${e.sent} posted${e.failed ? `, ${e.failed} failed` : ''}${e.stopped ? ' (stopped early)' : ''} · ${e.covered}/${e.total} covered`;
+    toast(
+      e.finished
+        ? 'Nothing left to post on this channel.'
+        : `Run finished — ${e.sent} posted${e.failed ? `, ${e.failed} failed` : ''}${e.stopped ? ', stopped' : ''}.`,
+      e.failed ? 'warn' : 'ok',
+    );
+    refreshTopics();
+  } else if (e.type === 'error') {
+    $('bartext').textContent = 'Error: ' + e.message;
+    toast('Error: ' + e.message, 'err');
+  }
+}
+
+// ---- buttons
+
+$('postBtn').onclick = async () => {
+  $('postBtn').disabled = true;
+  const saved = await post('/api/settings', settingsFromForm());
+  if (saved.error) {
+    toast('Settings not saved: ' + saved.error, 'err');
+    $('postBtn').disabled = false;
+    return;
+  }
+  const r = await post('/api/batch');
+  if (r.error) {
+    toast(r.error, 'err');
+    $('postBtn').disabled = false;
+  }
+};
+
+$('stopBtn').onclick = async () => {
+  toast('Stopping after the current question…', 'warn');
+  await post('/api/stop');
+};
+
+// ---- news forwarder
+
+$('fwSaveBtn').onclick = async () => {
+  const r = await post('/api/settings', { forwarder: fwSettingsFromForm() });
+  toast(r.error ? r.error : 'Forwarder settings saved.', r.error ? 'err' : 'ok');
+};
+
+$('fwAddBtn').onclick = async () => {
+  const link = $('fwLink').value.trim();
+  if (!link) return;
+  $('fwAddBtn').disabled = true;
+  $('fwStatus').textContent = 'Resolving the channel…';
+  const r = await post('/api/forward/source/add', { link });
+  $('fwAddBtn').disabled = false;
+  if (r.error) {
+    $('fwStatus').textContent = 'Error: ' + r.error;
+    toast(r.error, 'err');
+  } else {
+    $('fwLink').value = '';
+    $('fwStatus').textContent = 'Source added. Pick where to post it, then Save forwarder.';
+    toast('News source added.');
+  }
+};
+
+$('fwPreviewBtn').onclick = async () => {
+  $('fwPreviewBtn').disabled = true;
+  $('fwStatus').textContent = 'Reading the last window…';
+  const r = await post('/api/forward/preview', {});
+  $('fwPreviewBtn').disabled = false;
+  if (r.error) {
+    $('fwStatus').textContent = 'Error: ' + r.error;
+    $('fwPreview').style.display = 'none';
+    toast(r.error, 'err');
+    return;
+  }
+  const lines = [];
+  for (const src of r.sources ?? []) {
+    lines.push(`── ${src.name || src.jid} — ${src.count} message(s)${src.filteredOut ? `, ${src.filteredOut} filtered out` : ''}`);
+    for (const text of src.messages ?? []) lines.push('', text);
+  }
+  if (!lines.length) lines.push('Nothing new in this window.');
+  $('fwPreview').textContent = lines.join('\n');
+  $('fwPreview').style.display = 'block';
+  const count = (r.sources ?? []).reduce((n, s) => n + s.count, 0);
+  $('fwStatus').textContent = `Preview ready — ${count} message(s).`;
+  toast(count ? `Preview ready — ${count} message(s).` : 'Nothing new in the last window.', count ? 'ok' : 'warn');
+};
+
+$('fwNowBtn').onclick = async () => {
+  $('fwNowBtn').disabled = true;
+  $('fwStatus').textContent = 'Forwarding…';
+  const r = await post('/api/forward/now', {});
+  $('fwNowBtn').disabled = false;
+  $('fwStatus').textContent = r.error ? 'Error: ' + r.error : 'Forward run started — watch the log.';
+  toast(r.error ? r.error : 'Forward run started.', r.error ? 'err' : 'ok');
+};
+
+$('reconnectBtn').onclick = () => {
+  toast('Reconnecting…', 'warn');
+  post('/api/reconnect');
+};
+
+// ---- automatic schedule
+
+$('schSaveBtn').onclick = async () => {
+  const body = scheduleFromForm();
+  if (body.enabled && !body.times.length) {
+    $('schStatus').innerHTML = 'Add at least one time, e.g. <b>08:00</b>.';
+    toast('Add at least one time, e.g. 08:00.', 'warn');
+    return;
+  }
+  const r = await post('/api/settings', { schedule: body });
+  if (r.error) {
+    toast(r.error, 'err');
+    return;
+  }
+  scheduleFormLoaded = false;
+  toast(body.enabled ? 'Schedule saved.' : 'Schedule turned off.');
+};
+
+$('pairBtn').onclick = async () => {
+  const phone = $('pairPhone').value.trim();
+  if (phone.replace(/\D/g, '').length < 8) {
+    $('pairError').style.display = 'block';
+    $('pairError').textContent = 'Enter the full number with country code, e.g. 919812345678.';
+    $('pairPhone').focus();
+    return;
+  }
+  $('pairBtn').disabled = true;
+  $('pairError').style.display = 'none';
+  const r = await post('/api/pair', { phone });
+  $('pairBtn').disabled = false;
+  if (!r.ok) {
+    $('pairError').style.display = 'block';
+    $('pairError').textContent = r.error || 'Could not request a code.';
+    toast(r.error || 'Pairing code request failed.', 'err');
+  } else {
+    $('pairError').style.display = 'none';
+    toast('Pairing code requested — it appears below.', 'ok');
+  }
+};
+
+$('unlinkBtn').onclick = async () => {
+  if (!confirm('Re-link WhatsApp?\n\nThis deletes the saved session and you will have to scan a new QR code.')) return;
+  toast('Unlinking — a new QR will appear shortly…', 'warn');
+  await post('/api/unlink');
+};
+
+$('addChannelBtn').onclick = async () => {
+  const link = $('resolveLink').value.trim();
+  if (!link) return;
+  $('addChannelBtn').disabled = true;
+  const r = await post('/api/channels/add', { link });
+  if (r.error) {
+    toast(r.error, 'err');
+  } else {
+    $('resolveLink').value = '';
+    toast(`Added ${r.meta?.name || r.meta?.id || 'channel'}.`);
+  }
+  $('addChannelBtn').disabled = false;
+  refreshTopics();
+};
+
+$('repostBtn').onclick = async () => {
+  const position = Number($('repostPos').value);
+  const key = $('repostTarget').value;
+  if (!position || !key) {
+    toast('Type the question number you want to resend.', 'warn');
+    $('repostPos').focus();
+    return;
+  }
+  $('repostBtn').disabled = true;
+  const r = await post('/api/repost', { key, position });
+  toast(r.error ? r.error : `Reposted Q${r.position} — ${r.question}`, r.error ? 'err' : 'ok');
+  $('repostBtn').disabled = false;
+  refreshTopics();
+};
+
+$('tgSaveBtn').onclick = async () => {
+  const r = await post('/api/settings', {
+    telegram: { ...current.config.telegram, enabled: $('tgEnabled').checked, botToken: $('tgToken').value.trim() },
+  });
+  toast(r.error ? r.error : 'Telegram token saved.', r.error ? 'err' : 'ok');
+  refreshTopics();
+};
+
+$('tgFindBtn').onclick = async () => {
+  $('tgFindBtn').disabled = true;
+  await post('/api/settings', {
+    telegram: { ...current.config.telegram, enabled: true, botToken: $('tgToken').value.trim() },
+  });
+  const r = await post('/api/telegram/discover');
+  toast(r.error ? r.error : 'Telegram channels updated.', r.error ? 'err' : 'ok');
+  $('tgFindBtn').disabled = false;
+  refreshTopics();
+};
+
+$('tgEnabled').onchange = async () => {
+  await post('/api/settings', { telegram: { ...current.config.telegram, enabled: $('tgEnabled').checked } });
+};
+
+$('clearFilterBtn').onclick = () => {
+  [...$('modules').options].forEach((o) => { o.selected = false; });
+  [...$('subtopics').options].forEach((o) => { o.selected = false; });
+  $('moduleSearch').value = '';
+  $('subSearch').value = '';
+  refreshTopics();
+  toast('Using every question.');
+};
+
+$('previewBtn').onclick = async () => {
+  $('previewBtn').disabled = true;
+  const r = await post('/api/preview', { target: activeTarget });
+  $('previewBtn').disabled = false;
+  if (r.error) {
+    toast(r.error, 'err');
+    return;
+  }
+  if (r.finished) {
+    $('previewHint').textContent = 'Every question has already been posted to this channel.';
+    $('previewHint').style.display = 'block';
+    $('previewQ').style.display = 'none';
+    $('previewA').style.display = 'none';
+    openPreview();
+    return;
+  }
+  $('previewHint').style.display = 'none';
+  $('previewQ').style.display = 'block';
+
+  const spec = r.quiz || r.poll;
+  if (spec) {
+    const isQuiz = Boolean(r.quiz);
+    const marked = spec.values.map((v, i) => {
+      const tick = isQuiz && i === spec.correctIndex ? '✅' : '○';
+      return '   ' + tick + ' ' + v;
+    }).join('\n');
+    $('previewQ').textContent = (isQuiz
+      ? '📊 QUIZ (as subscribers will see it — they tap an option)\n\n'
+      : '📊 POLL (as subscribers will see it — they tap an option)\n\n')
+      + spec.name + '\n\n' + marked
+      + (isQuiz ? '' : '\n\n(correct: ' + r.correctLetter + ')');
+    $('previewA').style.display = isQuiz ? 'none' : 'block';
+  } else {
+    $('previewQ').textContent = r.questionText;
+    $('previewA').style.display = 'block';
+  }
+  $('previewA').textContent = r.answerText;
+  openPreview();
+};
+
+$('style').onchange = () => {
+  // Leaving quiz mode: poll/text need the answer posted separately, so tick it.
+  if ($('style').value !== 'quiz') $('includeAnswer').checked = true;
+  syncAnswerCheckbox();
+  syncStyleRadios();
+};
+
+$('order').onchange = () => {
+  syncOrderRadios();
+  refreshTopics();
+};
+
+['modules', 'subtopics'].forEach((id) => { $(id).onchange = refreshTopics; });
+
+$('resetBtn').onclick = async () => {
+  if (!confirm('Reset progress on EVERY channel?\n\nAll questions become available again from question 1.')) return;
+  const r = await post('/api/reset-progress', {});
+  toast(r.error ? r.error : 'Progress reset — every question is available again.', r.error ? 'err' : 'ok');
+  refreshTopics();
+};
+
+// ---- style and order controls ----------------------------------------
+
+function syncStyleRadios() {
+  const value = $('style').value;
+  document.querySelectorAll('input[name="stylePick"]').forEach((el) => {
+    el.checked = el.value === value;
+  });
+}
+
+function syncOrderRadios() {
+  const value = $('order').value;
+  document.querySelectorAll('input[name="orderPick"]').forEach((el) => {
+    el.checked = el.value === value;
+  });
+  $('orderHint').textContent = value === 'random'
+    ? 'Shuffles the pool once per run — still never repeats a question.'
+    : 'Carries on where the last run stopped — no repeats.';
+}
+
+document.querySelectorAll('input[name="stylePick"]').forEach((el) => {
+  el.onchange = () => {
+    $('style').value = el.value;
+    if ($('style').onchange) $('style').onchange();
+  };
+});
+
+document.querySelectorAll('input[name="orderPick"]').forEach((el) => {
+  el.onchange = () => {
+    $('order').value = el.value;
+    $('order').onchange();
+  };
+});
+
+// ---- topic pickers (chips instead of Ctrl+click) ----------------------
+
+/**
+ * The native multi-select requires Ctrl+click on a laptop and is close to
+ * unusable on a phone. The <select> is still the source of truth (everything
+ * else reads .selectedOptions), but it is hidden and this renders chips.
+ */
+function buildPicker(selectId, rootId, searchId) {
+  const select = $(selectId);
+  const root = $(rootId);
+  const search = $(searchId);
+  let query = '';
+
+  function render() {
+    if (!select.options.length) {
+      root.innerHTML = '<div class="hint" style="margin:4px">Loading…</div>';
+      return;
+    }
+    const q = query.trim().toLowerCase();
+    const options = [...select.options].filter((o) => !q || o.textContent.toLowerCase().includes(q));
+    if (!options.length) {
+      root.innerHTML = '<div class="hint" style="margin:4px">No match.</div>';
+      return;
+    }
+    root.innerHTML = options.map((o) => {
+      const [name, count = ''] = o.textContent.split('  —  ');
+      return `<button type="button" class="opt ${o.selected ? 'on' : ''}" data-val="${esc(o.value)}" aria-pressed="${o.selected}">
+        <span class="tick">✓</span><span>${esc(name)}</span><span class="cnt">${esc(count.trim())}</span>
+      </button>`;
+    }).join('');
+  }
+
+  root.addEventListener('click', (e) => {
+    const btn = e.target.closest('button.opt');
+    if (!btn) return;
+    const option = [...select.options].find((o) => o.value === btn.dataset.val);
+    if (!option) return;
+    option.selected = !option.selected;
+    render();
+    updatePickerCounts();
+    refreshTopics();
+  });
+
+  search.addEventListener('input', () => {
+    query = search.value;
+    render();
+  });
+
+  return render;
+}
+
+const pickerRenders = [
+  buildPicker('modules', 'modulePicker', 'moduleSearch'),
+  buildPicker('subtopics', 'subPicker', 'subSearch'),
+];
+
+function updatePickerCounts() {
+  const mods = $('modules').selectedOptions.length;
+  const subs = $('subtopics').selectedOptions.length;
+  $('moduleCount').textContent = mods ? `${mods} selected` : 'All';
+  $('subCount').textContent = subs ? `${subs} selected` : 'All';
+}
+
+function syncPickers() {
+  for (const render of pickerRenders) render();
+  updatePickerCounts();
+}
+
+// ---- sections ---------------------------------------------------------
+
+const TABS = ['post', 'channels', 'automation', 'system'];
+
+function goTab(name, scroll = true) {
+  if (!TABS.includes(name)) return;
+  document.querySelectorAll('.tabbtn').forEach((b) => {
+    b.classList.toggle('active', b.dataset.goto === name);
+  });
+  document.querySelectorAll('section.tab').forEach((s) => {
+    s.classList.toggle('active', s.dataset.tab === name);
+  });
+  history.replaceState(null, '', '#' + name);
+  if (scroll) window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+document.querySelectorAll('.tabbtn').forEach((b) => {
+  b.onclick = () => goTab(b.dataset.goto);
+});
+
+$('pill').onclick = () => goTab('system');
+
+const startTab = (location.hash || '').replace('#', '');
+if (TABS.includes(startTab)) goTab(startTab, false);
+
+// ---- sticky action dock ----------------------------------------------
+
+function mirrorDock() {
+  $('dockText').textContent = $('bartext').textContent;
+  $('dockBar').style.width = $('bar').style.width || '0%';
+  $('dockStop').disabled = $('stopBtn').disabled;
+  $('dockPost').disabled = $('postBtn').disabled;
+  $('dockPost').textContent = $('postBtn').textContent;
+}
+
+new MutationObserver(mirrorDock).observe($('bartext'), { childList: true, characterData: true, subtree: true });
+new MutationObserver(mirrorDock).observe($('bar'), { attributes: true, attributeFilter: ['style'] });
+new MutationObserver(mirrorDock).observe($('stopBtn'), { attributes: true, attributeFilter: ['disabled'] });
+new MutationObserver(mirrorDock).observe($('postBtn'), { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['disabled'] });
+
+$('dockPost').onclick = () => $('postBtn').click();
+$('dockStop').onclick = () => $('stopBtn').click();
+$('dockText').onclick = () => {
+  goTab('post', false);
+  $('log').scrollIntoView({ behavior: 'smooth', block: 'center' });
+};
+mirrorDock();
+
+// ---- preview sheet ----------------------------------------------------
+
+function openPreview() {
+  $('previewModal').classList.add('open');
+}
+
+function closePreview() {
+  $('previewModal').classList.remove('open');
+}
+
+$('previewClose').onclick = closePreview;
+$('previewModal').onclick = (e) => {
+  if (e.target === $('previewModal')) closePreview();
+};
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closePreview();
+});
+
+// ---- clock (next run, countdown) -------------------------------------
+
+function tick() {
+  const schedule = current.schedule ?? {};
+  const next = schedule.enabled ? Number(schedule.nextAt) || 0 : 0;
+  const left = next ? next - Date.now() : 0;
+  const gap = next ? (left <= 0 ? 'now' : humanGap(left)) : '';
+
+  const inline = $('schNextIn');
+  if (inline) inline.textContent = next ? gap : '';
+
+  $('sysNext').textContent = next
+    ? `${new Date(next).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })} · in ${gap}`
+    : '—';
+
+  $('dockNext').textContent = !current.running && schedule.enabled && next
+    ? `Next automatic run in ${gap}`
+    : '';
+}
+
+setInterval(tick, 1000);
+tick();
+
+// ---- log tools --------------------------------------------------------
+
+$('logFilter').onchange = renderLog;
+$('logClear').onclick = () => {
+  logEntries.length = 0;
+  $('log').innerHTML = '';
+};
+
+// ---- estimates --------------------------------------------------------
+
+['size', 'gap'].forEach((id) => { $(id).oninput = renderEstimate; });
+renderEstimate();
+
+// ---- boot
+
+fetch('/api/status').then((r) => r.json()).then(applyStatus).catch(() => {});
+
+const es = new EventSource('/api/events');
+es.addEventListener('status', (ev) => applyStatus(JSON.parse(ev.data)));
+es.addEventListener('log', (ev) => addLog(JSON.parse(ev.data)));
+es.addEventListener('progress', (ev) => onProgress(JSON.parse(ev.data)));
+es.addEventListener('batch', (ev) => {
+  current.running = JSON.parse(ev.data).running;
+  refreshButtons();
+});
+es.onerror = () => setPill('disconnected');
+</script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+# WhatsApp session and state
+auth/
+state/
+*.lock
+*.log
+
+# Personal config with private tokens/channels
+config.json
+.env
+
+# Node
+node_modules/
+
+# Android build outputs & local config
+android/.gradle/
+android/build/
+android/app/build/
+android/app/.cxx/
+android/dist/
+android/app/src/main/jniLibs/
+*.apk
+*.so
+android/local.properties
+android/keystore/keystore.properties
+android/keystore/*.jks
+
+# Temporary archives & backups
+*.zip
+*.tmp
+*.bak*

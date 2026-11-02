@@ -1,0 +1,25 @@
+{
+  "name": "whatsapp-poster",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Posts daily quiz questions from a JSON question bank to a WhatsApp Channel (via Baileys).",
+  "scripts": {
+    "gui": "node src/gui/server.js",
+    "test": "node --test",
+    "post": "node src/index.js batch",
+    "batch": "node src/index.js batch",
+    "login": "node src/index.js login",
+    "preview": "node src/index.js preview",
+    "send-now": "node src/index.js send-now",
+    "jid": "node src/index.js jid",
+    "start": "node src/gui/server.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^7.0.0-rc14",
+    "node-cron": "^4.6.0",
+    "pino": "^10.4.0",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0"
+  }
+}
