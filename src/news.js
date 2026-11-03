@@ -116,7 +116,7 @@ export async function processExaNews(cfg, sock = null, options = {}) {
       postedCount++;
       await new Promise((r) => setTimeout(r, 3000));
     }
-    saveState(primaryTarget, state);
+    saveState(state);
   }
 
   return {

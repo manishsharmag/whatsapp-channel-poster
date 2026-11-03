@@ -18,3 +18,17 @@ test('formatNewsBulletin formats clean channel post with title, highlights, and 
   assert.ok(text.includes('• Online applications open on 24.06.2026 and close on 30.06.2026'));
   assert.ok(text.includes('🔗 *Official Link:* https://hssc.gov.in/notice/123'));
 });
+
+test('searchExaNews throws cleanly when EXA_API_KEY is missing', async () => {
+  const { searchExaNews } = await import('../src/news.js');
+  const prev = process.env.EXA_API_KEY;
+  try {
+    delete process.env.EXA_API_KEY;
+    await assert.rejects(
+      () => searchExaNews('test', ''),
+      /EXA_API_KEY is not configured/
+    );
+  } finally {
+    if (prev) process.env.EXA_API_KEY = prev;
+  }
+});
