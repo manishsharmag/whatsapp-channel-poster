@@ -910,6 +910,23 @@ button.iconbtn:hover { color: #ffb4b4; border-color: rgba(239, 68, 68, .4); back
       </div>
     </div>
 
+    <div class="card" id="newsMonitorCard" style="margin-top:16px">
+      <div class="cardhead">
+        <h2><span class="step">5</span>Live Exam News Monitor (Exa AI)</h2>
+        <span class="chip" id="newsBadge">Exa Active</span>
+      </div>
+      <div class="hint" style="margin-top:0">
+        Monitors the web via Exa AI for breaking HSSC CET, Police, Clerk, and Haryana Govt job notices, admit cards, and results. Fresh alerts are formatted with official links and posted automatically to your channels.
+      </div>
+      <label for="newsQuery">Search topic</label>
+      <input type="text" id="newsQuery" value="latest Haryana government jobs exam notifications HSSC CET police admit card result date" autocomplete="off">
+      <div class="btnrow" style="margin-top:12px">
+        <button class="primary" id="newsCheckBtn" type="button">📢 Check & Post Fresh News</button>
+        <button class="ghost" id="newsPreviewBtn" type="button">👁 Preview Exa News</button>
+      </div>
+      <div id="newsPreviewArea" style="margin-top:12px"></div>
+    </div>
+
     <div class="card" id="growthCard" style="margin-top:16px">
       <div class="cardhead">
         <h2>🌱 Grow the channel</h2>
@@ -1935,6 +1952,43 @@ $('grSaveBtn').onclick = async () => {
   toast(body.enabled
     ? (body.dryRun ? 'Growth saved — dry run, nothing will be joined or sent.' : 'Growth saved — live.')
     : 'Growth turned off.');
+};
+
+$('newsPreviewBtn').onclick = async () => {
+  $('newsPreviewBtn').disabled = true;
+  $('newsPreviewArea').innerHTML = '<div class="empty">Searching official web via Exa AI…</div>';
+  const q = $('newsQuery').value.trim();
+  const r = await fetch('/api/news/preview?q=' + encodeURIComponent(q)).then((res) => res.json()).catch((err) => ({ error: err.message }));
+  $('newsPreviewBtn').disabled = false;
+  if (r.error || !r.ok) {
+    $('newsPreviewArea').innerHTML = `<div class="empty">${esc(r.error || 'Failed to search Exa')}</div>`;
+    toast(r.error || 'Failed to reach Exa', 'err');
+    return;
+  }
+  if (!r.articles?.length) {
+    $('newsPreviewArea').innerHTML = '<div class="empty">No updates found for this query.</div>';
+    return;
+  }
+  $('newsPreviewArea').innerHTML = r.articles.map((a) => `
+    <div class="growresult" style="margin-bottom:8px">
+      <b>${esc(a.title)}</b>
+      <div class="hint" style="margin:4px 0">${esc((a.highlights || []).join(' '))}</div>
+      <div class="meta"><a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.url)}</a></div>
+    </div>
+  `).join('');
+  toast(`Found ${r.articles.length} news bulletin(s) on Exa.`);
+};
+
+$('newsCheckBtn').onclick = async () => {
+  $('newsCheckBtn').disabled = true;
+  const q = $('newsQuery').value.trim();
+  const r = await post('/api/news/check', { query: q, dryRun: $('dryRun').checked });
+  $('newsCheckBtn').disabled = false;
+  if (r.error) {
+    toast(r.error, 'err');
+    return;
+  }
+  toast(`News Check: ${r.result?.count ?? 0} new, ${r.result?.posted ?? 0} posted.`);
 };
 
 $('grTickBtn').onclick = async () => {

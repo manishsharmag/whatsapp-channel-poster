@@ -34,6 +34,7 @@ import {
   verifySessionToken,
   SESSION_COOKIE,
 } from './auth.js';
+import { searchExaNews, processExaNews, formatNewsBulletin } from '../news.js';
 import {
   candidateLabel,
   ensureGrowth,
@@ -1221,14 +1222,14 @@ function removeGrowthCandidate(id) {
 
 let lastExaSearchAt = 0;
 
-/** Find public invite links with Exa. Needs EXA_API_KEY on the server. */
+/** Find public invite links with Exa following canonical build-with-exa recommendations. */
 async function searchPublicGroups(query) {
-  const key = String(process.env.EXA_API_KEY ?? '').trim();
+  const key = String(process.env.EXA_API_KEY ?? cfg.exaApiKey ?? '').trim();
   if (!key) throw new Error('Set EXA_API_KEY on the server to use web discovery.');
   const text = String(query ?? '').trim();
   if (!text) throw new Error('Type what to search for, e.g. “HSSC Haryana exam”.');
-  if (Date.now() - lastExaSearchAt < 20_000) {
-    throw new Error('Wait 20 seconds between searches.');
+  if (Date.now() - lastExaSearchAt < 10_000) {
+    throw new Error('Wait 10 seconds between searches.');
   }
   lastExaSearchAt = Date.now();
 
@@ -1236,10 +1237,10 @@ async function searchPublicGroups(query) {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': key },
     body: JSON.stringify({
-      query: `${text} WhatsApp group invite link`,
-      type: 'neural',
-      numResults: 10,
-      contents: { text: { maxCharacters: 800 } },
+      query: `${text} WhatsApp group invite links chat.whatsapp.com`,
+      type: 'auto',
+      numResults: 15,
+      contents: { highlights: true },
     }),
   });
   if (!res.ok) throw new Error(`Exa answered ${res.status}. Check the API key.`);
@@ -1247,15 +1248,15 @@ async function searchPublicGroups(query) {
   const data = await res.json();
   const found = new Map();
   for (const result of data.results ?? []) {
-    const blob = `${result.url ?? ''}\n${result.title ?? ''}\n${result.text ?? ''}`;
-    for (const match of blob.matchAll(/chat\.whatsapp\.com\/(?:invite\/)?([A-Za-z0-9]{10,})/g)) {
+    const blob = `${result.url ?? ''}\n${result.title ?? ''}\n${(result.highlights ?? []).join('\n')}\n${result.text ?? ''}`;
+    for (const match of blob.matchAll(/chat\.whatsapp\.com\/(?:invite\/)?([A-Za-z0-9_-]{15,30})/gi)) {
       if (found.has(match[1])) continue;
       found.set(match[1], {
         code: match[1],
         link: inviteLink(match[1]),
-        title: result.title ?? '',
+        title: result.title ?? 'WhatsApp Group',
         url: result.url ?? '',
-        snippet: String(result.text ?? '').replace(/\s+/g, ' ').slice(0, 220),
+        snippet: (result.highlights?.[0] || String(result.text ?? '')).replace(/\s+/g, ' ').slice(0, 220),
       });
     }
   }
@@ -1672,6 +1673,22 @@ const server = http.createServer(async (req, res) => {
 
     if (route === '/api/growth/tick' && req.method === 'POST') {
       return sendJson(res, 200, { ok: true, ...(await growthTick()) });
+    }
+
+    if (route === '/api/news/preview' && req.method === 'GET') {
+      const q = url.searchParams.get('q') || '';
+      const articles = await searchExaNews(q, process.env.EXA_API_KEY || cfg.exaApiKey);
+      return sendJson(res, 200, { ok: true, articles });
+    }
+
+    if (route === '/api/news/check' && req.method === 'POST') {
+      const body = await readBody(req);
+      const result = await processExaNews(cfg, sock, {
+        dryRun: Boolean(body.dryRun),
+        query: body.query,
+      });
+      log('info', `Exa News: ${result.articles?.length ?? 0} article(s) found, ${result.posted ?? 0} posted.`);
+      return sendJson(res, 200, { ok: true, result });
     }
 
     if (route === '/api/batch' && req.method === 'POST') {

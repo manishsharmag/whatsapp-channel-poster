@@ -24,6 +24,10 @@ android/local.properties
 android/keystore/keystore.properties
 android/keystore/*.jks
 
+# Agent skills & local tooling
+.agents/
+skills-lock.json
+
 # Temporary archives & backups
 *.zip
 *.tmp
