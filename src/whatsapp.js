@@ -10,12 +10,12 @@ import qrcode from 'qrcode-terminal';
 import pino from 'pino';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { projectRoot } from './config.js';
+import { dataDir } from './config.js';
 
 const logger = pino({ level: 'silent' });
 
 export function authDir() {
-  return path.join(projectRoot(), 'auth');
+  return path.join(dataDir(), 'auth');
 }
 
 // ---------------------------------------------------------------------------

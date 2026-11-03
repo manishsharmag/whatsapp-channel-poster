@@ -80,8 +80,16 @@ if (!minimal) {
       botToken: '',
       chats: [],
     };
-    forDevice.selection = { modules: [], subtopics: [], mode: 'sequence' };
+    forDevice.selection = { modules: [], subtopics: [], mode: 'sequence', quotas: [], quotaOrder: 'grouped' };
     forDevice.batch = { ...cfg.batch, size: 50, gapSeconds: 20 };
+    // Growth is the riskiest feature; a shared APK starts with it fully off.
+    forDevice.growth = {
+      enabled: false,
+      dryRun: true,
+      channelLink: '',
+      autoJoin: false,
+      autoShare: false,
+    };
     forDevice.forwarder = {
       ...(cfg.forwarder ?? {}),
       enabled: false,

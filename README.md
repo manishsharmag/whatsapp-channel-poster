@@ -27,6 +27,7 @@ with an action bar pinned to the bottom that always shows the current progress a
 - **Post to several channels** at once — tick the ones you want, each keeps its own progress
 - **Also post to Telegram** — quizzes, polls and text all work there too
 - **Pick what to send** — tap module and subtopic chips (or search them) instead of Ctrl+clicking a list; the count of questions that are still unsent updates live
+- **Choose a question mix** — Balanced 50 (10 each of Maths, Reasoning, English, Hindi, GK), 10 from every subject, Maths + Reasoning, or Random 50; a mix replaces the topic filter and sets the run length itself
 - **Post format** — Quiz (tap to answer, tells you right/wrong), Poll, or plain Text
 - **Post Now** — choose how many questions (default 50) and the gap (default 20s); the panel shows how long the run will take
 - **Watch progress** in the sticky bottom bar and a scrolling log with an info/warning/error filter
@@ -34,6 +35,7 @@ with an action bar pinned to the bottom that always shows the current progress a
 - **Preview next** — opens a preview sheet with the exact quiz / poll / question + answer before posting
 - **Test** button per channel — sends one "hello" message so you can check you can post there
 - **Dry run** checkbox — try everything without sending
+- **Grow the channel** (Automation tab) — find public groups, join them slowly, share your channel link once per group; off by default and dry-run by default
 - **Re-link WhatsApp** — wipe the session and scan a fresh QR (fixes stuck "440" loops)
 - **Reset progress** — start the bank over from question 1 (per channel, or all)
 
@@ -72,6 +74,31 @@ matching questions each channel still has left.
 Deselect everything (or hit **Clear selection**) to go back to using all topics.
 Progress is still tracked per question, so a themed test never repeats a question
 you have already sent — to any run, themed or not.
+
+### Question mixes (presets)
+
+The preset bar under **2 · What to send** builds a run out of per-subject quotas:
+
+| Preset | What it does |
+|---|---|
+| ⚖️ **Balanced 50** | 10 Quantitative, 10 Reasoning, 10 English, 10 Hindi, 10 General Knowledge |
+| 🔢 **10 each** | 10 from every subject that still has unsent questions |
+| ➗ **Maths + Reasoning** | 25 + 25 |
+| 🎲 **Random 50** | clears the mix, then posts 50 questions in random order |
+
+A mix is a list of `{ module, count }` rows. You can edit any count, add another
+subject, or remove a row. **Grouped** sends one subject after another; **Mixed**
+cycles through the subjects question by question.
+
+Two rules matter:
+
+- A mix **replaces** the module/subtopic filter. Ticking a topic chip clears the mix,
+  and starting a mix clears the chips — the two are different ways to choose questions.
+- The **sum of the quotas is the run length**. `batch.size` is ignored while a mix is
+  set, so a scheduled run cannot silently cut a 140-question mix down to 50.
+
+If a subject has fewer unsent questions than its quota, the panel says how many are
+ready and the run posts what exists instead of borrowing from another subject.
 
 ### The first and last message
 
@@ -456,6 +483,119 @@ The laptop must be **awake and online** at post times. Sleep will delay posts.
 
 ---
 
+## ☁️ Running on a cloud host (botkeep, Docker, VPS)
+
+The panel is a normal Node web server, so it runs anywhere Node 18+ runs. Two
+things are different from the desktop:
+
+1. **The panel must have a password.** On a public host, set `PANEL_PASSWORD`.
+   If you forget, the server generates one on first boot, prints it once, and
+   saves it to `auth/panel-password.txt`; you can also set the variable later.
+2. **Data must live on a volume.** A redeploy replaces the app folder. Set
+   `DATA_DIR` to a mounted folder (for example `/data`) so `config.json`,
+   `state/` and `auth/` survive. Without this, a redeploy looks like a brand-new
+   install: WhatsApp **Disconnected** and **0 / 4688 sent**.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PANEL_PASSWORD` | *(empty)* | Require a login. Empty + public bind = a generated password |
+| `DATA_DIR` | project folder | Where `config.json`, `state/` and `auth/` are kept |
+| `SERVER_PORT` / `PORT` | `8777` | Port to listen on (cloud hosts usually set one) |
+| `HOST` | loopback locally, `0.0.0.0` when a port env is set | Bind address |
+| `EXA_API_KEY` | *(empty)* | Optional; enables “Search web” in the growth card |
+| `NO_BROWSER` | *(empty)* | Do not open a local browser (`true` on a server) |
+| `NO_CONNECT` | *(empty)* | Do not connect WhatsApp at boot (`true` for a UI-only test) |
+
+Deploy checklist:
+
+1. Put `DATA_DIR` on a **persistent volume** (botkeep: mount it and set the env var).
+2. Set `PANEL_PASSWORD` (a long random string) and `NODE_ENV=production`.
+3. Upload/extract the bundle and start `node src/gui/server.js` (or `npm start`).
+4. Open the URL, sign in, then link WhatsApp from **System**. The QR/session
+   files go into `$DATA_DIR/auth`.
+5. Open **System → Data folder** and confirm it points at the volume.
+6. Reboot/redeploy once and check that the connection and the sent count survive.
+
+Security notes:
+
+- `/api/status` no longer contains the Telegram bot token. The token field in the
+  panel stays blank; leaving it blank keeps the saved token, typing a new one
+  replaces it.
+- Cookies are `HttpOnly`, `SameSite=Lax`, signed with the password, and marked
+  `Secure` when the request arrived over HTTPS. Changing `PANEL_PASSWORD` signs
+  every session out.
+- Failed logins are rate-limited. All routes, including the live event stream,
+  require the session cookie.
+- `botkeep-deploy.zip` is built **without** the real `config.json` token, `auth/`
+  or `state/`. If you make your own zip, do not include those either.
+- A public panel controls a live WhatsApp account. Use HTTPS, and do not share
+  the URL and password in the same chat.
+
+### Checking that a redeploy really took
+
+A redeploy replaces the running code, so the panel can look unchanged for a
+minute. Open these four things after uploading:
+
+| Check | What "new build" looks like |
+|---|---|
+| Open the URL in a private window | You get the **sign-in page**, not the panel |
+| **System** tab | **Panel access** card shows *Password required* and the **Data folder** |
+| **Post** tab | The mix preset bar (Balanced 50 / 10 each / Maths + Reasoning / Random 50) |
+| **Automation** tab | The **🌱 Grow the channel** card exists, with **Dry run** ticked |
+
+If the sign-in page does not appear, `PANEL_PASSWORD` is empty and the bind is
+loopback — check `HOST` and the port variable. If **Data folder** points at the
+app folder rather than the volume, `DATA_DIR` is missing and the next redeploy
+will wipe the WhatsApp session and the sent count again.
+
+---
+
+## 🌱 Automatic growth (joining groups)
+
+> **Read this first.** WhatsApp treats automated joining and link-dropping as
+> spam. This is the feature most likely to get a number banned. It is off by
+> default, runs in dry-run mode by default, and is deliberately slow. Use a
+> secondary number if you can.
+
+The growth card lives in the **Automation** tab and does five things:
+
+1. **Discover** — paste a public invite link (`chat.whatsapp.com/…`), or set
+   `EXA_API_KEY` and use **Search web**. Exa searches the public web; it cannot
+   see private groups. Always preview a group before joining it.
+2. **Queue** — previewing only reads the group name and member count. Nothing is
+   joined yet.
+3. **Approve** — a queued group is `Waiting for approval`. Only approved groups
+   can be auto-joined.
+4. **Join** — respects `joins / day`, `minutes between joins` and `max groups`.
+   In dry run it only writes a log line.
+5. **Share** — after the group is old enough (`wait before sharing`, default 24h),
+   posts your channel link **once**, respecting `shares / day` and the gap.
+   Templates use `{link}` and `{name}`.
+
+Safety controls:
+
+| Control | Default | Why |
+|---|---|---|
+| `enabled` | off | Master kill switch |
+| `dryRun` | on | Log actions without touching WhatsApp |
+| `joinPerDay` | 3 | Keeps joining under the radar |
+| `joinGapMinutes` | 60 | No burst-joining |
+| `maxGroups` | 25 | Hard ceiling on membership |
+| `shareAfterHours` | 24 | Do not drop a link the second you join |
+| `sharePerDay` | 2 | One message, not a campaign |
+| `allowlist` | empty | Restrict to known groups |
+| `blocked` | empty | Skip groups whose name contains these words |
+
+The background worker looks every 10 minutes. **Run growth now** triggers one
+check immediately. Both `auto-join` and `auto-share` must be ticked for it to act
+without you. The panel shows exactly why it is waiting (“Next join in 42 min.”,
+“Daily share limit reached”, …).
+
+If you only want to share the channel link and not join, do not enable growth;
+the same actions are available one group at a time from the card.
+
+---
+
 ## Config reference
 
 | Key | Meaning |
@@ -463,7 +603,7 @@ The laptop must be **awake and online** at post times. Sleep will delay posts.
 | `channels` | Array of `{ jid, name, enabled }` — every WhatsApp channel you post to |
 | `channelJid` | Legacy single channel; still read, and kept in sync with `channels[0]` |
 | `telegram` | `{ enabled, botToken, chats: [{ chatId, name, enabled }] }` |
-| `selection` | `{ modules: [], subtopics: [], mode: "sequence" \| "random" }` — empty lists mean all topics |
+| `selection` | `{ modules: [], subtopics: [], mode: "sequence" \| "random", quotas: [{ module, count }], quotaOrder: "grouped" \| "mixed" }` — empty lists mean all topics; a quota mix replaces the filters and sets the run length |
 | `bankPaths` | Array of JSON question-bank files (any mix of formats). Relative paths are resolved from the project folder |
 | `mode` | `quiz` (Q then A) or `single` (both together) |
 | `postTimes` | `["08:00","20:00"]` — 24h, in `timezone` |
@@ -479,6 +619,7 @@ The laptop must be **awake and online** at post times. Sleep will delay posts.
 | `resetWhenFinished` | `true` = restart from the top after all questions are used |
 | `schedule` | `{ enabled, times: ["08:00"], weekdays: [], size: 0, gapSeconds: -1, style: "" }` — card 5; `[]` weekdays = every day, `0`/`-1`/`""` = use `batch` |
 | `forwarder` | `{ enabled, intervalMinutes, sources, targets, maxPerRun, gapSeconds, header, keywords, blocked }` — card 4 |
+| `growth` | `{ enabled, dryRun, channelLink, message, joinPerDay, joinGapMinutes, shareAfterHours, sharePerDay, shareGapMinutes, maxGroups, autoJoin, autoShare, allowlist, blocked }` — group growth; see the growth section |
 
 Batch keys (inside `"batch"`):
 

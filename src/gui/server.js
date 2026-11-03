@@ -2,10 +2,11 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { exec } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import QRCode from 'qrcode';
-import { loadConfig } from '../config.js';
-import { loadState, saveState, targetState, recordRun } from '../state.js';
+import { loadConfig, configFile, dataDir } from '../config.js';
+import { loadState, saveState, targetState, recordRun, dayKey } from '../state.js';
 import { connectWhatsApp } from '../whatsapp.js';
 import { loadPool, previewNext, runBatch, topicInventory, describeContent, buildContents } from '../batch.js';
 import { optionOrder } from '../format.js';
@@ -21,15 +22,47 @@ import {
   noteIncomingMessage,
   subscribeSources,
 } from '../forward.js';
+import {
+  authRequired,
+  checkPassword,
+  createLoginThrottle,
+  createSessionToken,
+  clearCookie,
+  isSecureRequest,
+  parseCookies,
+  sessionCookie,
+  verifySessionToken,
+  SESSION_COOKIE,
+} from './auth.js';
+import {
+  candidateLabel,
+  ensureGrowth,
+  groupSize,
+  inviteCode,
+  inviteLink,
+  isAllowed,
+  isBlocked,
+  joinGate,
+  makeCandidate,
+  nextShare,
+  normalizeGrowthSettings,
+  pendingCandidates,
+  joinedGroups,
+  rollGrowthDay,
+  shareText,
+} from '../growth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '../..');
-const CONFIG_FILE = path.join(ROOT, 'config.json');
-const AUTH_DIR = path.join(ROOT, 'auth');
+const CONFIG_FILE = configFile();
+const AUTH_DIR = path.join(dataDir(), 'auth');
 const UI_FILE = path.join(__dirname, 'index.html');
 
 const PORT = Number(process.env.SERVER_PORT ?? process.env.PORT ?? 8777);
-const HOST = process.env.HOST ?? '0.0.0.0';
+// Locally the panel should only listen on the loopback interface. A cloud
+// host sets PORT / SERVER_PORT, and then it must listen publicly.
+const HOST = process.env.HOST
+  ?? (process.env.SERVER_PORT || process.env.PORT ? '0.0.0.0' : '127.0.0.1');
 
 let cfg = loadConfig();
 
@@ -110,9 +143,13 @@ function readRawConfig() {
 }
 
 function publicConfig() {
+  // Never send the bot token to the browser. The panel keeps the saved token
+  // when the field is left blank; "hasTelegramToken" is only a hint for the UI.
+  const token = String(cfg.telegram?.botToken ?? '');
   return {
     channels: cfg.channels,
-    telegram: cfg.telegram,
+    telegram: { ...cfg.telegram, botToken: '' },
+    hasTelegramToken: Boolean(token),
     selection: cfg.selection,
     language: cfg.language,
     shuffleOptions: cfg.shuffleOptions !== false,
@@ -122,8 +159,10 @@ function publicConfig() {
     batch: cfg.batch,
     forwarder: cfg.forwarder,
     schedule: cfg.schedule,
+    growth: cfg.growth,
     phoneNumber: cfg.phoneNumber ?? '',
     loginMethod: cfg.loginMethod ?? 'qr',
+    authRequired: authRequired(),
   };
 }
 
@@ -154,9 +193,12 @@ function statusPayload() {
     channelError: usable > 0 ? null : 'No channel selected yet — add a WhatsApp channel or a Telegram chat below.',
     forward: forwardStatus(cfg),
     schedule: scheduleStatus(),
+    growth: growthStatus(),
     runs: recentRuns(),
     stats: targetStats(enabledTargets(cfg)[0]?.key ?? targets[0]?.key ?? ''),
     config: publicConfig(),
+    auth: { required: authRequired() },
+    dataDir: dataDir(),
     bankFiles: cfg.bankPaths.map((p) => path.basename(p)),
   };
 }
@@ -171,9 +213,18 @@ function saveConfigPatch(patch) {
   if (patch.batch) next.batch = { ...(raw.batch ?? {}), ...patch.batch };
   if (patch.forwarder) next.forwarder = { ...(raw.forwarder ?? {}), ...patch.forwarder };
   if (patch.schedule) next.schedule = { ...(raw.schedule ?? {}), ...patch.schedule };
-  if (patch.telegram && raw.telegram) {
-    next.telegram = { ...raw.telegram, ...patch.telegram };
-    if (patch.telegram.chats) next.telegram.chats = patch.telegram.chats;
+  if (patch.telegram) {
+    const rawTg = raw.telegram && typeof raw.telegram === 'object' ? raw.telegram : {};
+    const nextTg = { ...rawTg, ...patch.telegram };
+    // The browser never receives the token, so an empty field means "keep the
+    // saved one". Anything that is not token-shaped (e.g. a masked ••••) is
+    // also ignored instead of overwriting a working token with junk.
+    const typed = String(patch.telegram.botToken ?? '').trim();
+    nextTg.botToken = /^\d+:[\w-]+$/.test(typed)
+      ? typed
+      : String(rawTg.botToken ?? '');
+    if (patch.telegram.chats) nextTg.chats = patch.telegram.chats;
+    next.telegram = nextTg;
   }
   // Keep yesterday's file: if a wrong token or channel is saved, the previous
   // settings are one rename away instead of retyped from memory.
@@ -199,8 +250,13 @@ function readBody(req) {
       if (data.length > 1e6) reject(new Error('Body too large'));
     });
     req.on('end', () => {
+      if (!data) return resolve({});
+      const type = String(req.headers['content-type'] ?? '');
+      if (type.includes('application/x-www-form-urlencoded')) {
+        return resolve(Object.fromEntries(new URLSearchParams(data)));
+      }
       try {
-        resolve(data ? JSON.parse(data) : {});
+        resolve(JSON.parse(data));
       } catch {
         resolve({});
       }
@@ -212,6 +268,16 @@ function readBody(req) {
 function sendJson(res, code, obj) {
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(obj));
+}
+
+function sendHtml(res, code, html, headers = {}) {
+  res.writeHead(code, { 'Content-Type': 'text/html; charset=utf-8', ...headers });
+  res.end(html);
+}
+
+function redirect(res, location, headers = {}) {
+  res.writeHead(303, { Location: location, ...headers });
+  res.end();
 }
 
 // ---------------------------------------------------------------- forwarder
@@ -510,6 +576,8 @@ async function ensureConnect({ force = false } = {}) {
         } catch { /* socket has no event emitter — fetch still works */ }
         subscribeSources(opened, cfg).catch(() => {});
         log('ok', `Connected to WhatsApp as ${me ?? 'unknown'}`);
+        // Fill in any channel that only has a raw JID as its name.
+        refreshChannelNames(opened).catch(() => {});
         pushStatus();
       },
       onClose: (code, loggedOut) => {
@@ -577,8 +645,65 @@ async function verifyTarget(target) {
   }
   const meta = await sock.newsletterMetadata('jid', target.jid);
   if (!meta?.id) throw new Error(`Could not read the channel ${target.jid}. Check the channel ID.`);
+  // The panel should show "HSSC Group D", never "1203…@newsletter".
+  rememberChannelName(target.jid, meta.name);
   log('ok', `Channel verified: ${meta.name ?? target.jid}`);
   return meta;
+}
+
+/**
+ * Replace an empty channel name with the real one from WhatsApp.
+ *
+ * Names were only read when a channel was added, so a channel that was already
+ * in config.json (or added while offline) stayed as its raw JID forever.
+ */
+function rememberChannelName(jid, name) {
+  const clean = String(name ?? '').trim();
+  if (!jid || !clean || clean === jid) return false;
+  const hit = (cfg.channels ?? []).find((c) => c.jid === jid);
+  if (!hit) return false;
+  // Keep a name the user edited by hand; only fill an empty / id-shaped label.
+  if (hit.name && hit.name !== hit.jid) return false;
+
+  const channels = cfg.channels.map((c) => (c.jid === jid ? { ...c, name: clean } : { ...c }));
+  try {
+    saveConfigPatch({ channels });
+    log('ok', `Channel name saved: ${clean}`);
+    return true;
+  } catch (err) {
+    log('warn', `Could not save the channel name: ${err.message}`);
+    return false;
+  }
+}
+
+/** Fill every unnamed channel once the connection is up. */
+async function refreshChannelNames(activeSock = sock) {
+  if (!activeSock) return;
+  const missing = (cfg.channels ?? []).filter(
+    (c) => (!c.name || c.name === c.jid) && String(c.jid).endsWith('@newsletter'),
+  );
+  if (!missing.length) return;
+  const channels = cfg.channels.map((c) => ({ ...c }));
+  let changed = false;
+  for (const channel of channels) {
+    if (channel.name && channel.name !== channel.jid) continue;
+    try {
+      const meta = await activeSock.newsletterMetadata('jid', channel.jid);
+      if (meta?.name) {
+        channel.name = meta.name;
+        changed = true;
+      }
+    } catch (err) {
+      log('warn', `Could not read the name of ${channel.jid}: ${err.message}`);
+    }
+  }
+  if (!changed) return;
+  try {
+    saveConfigPatch({ channels });
+    log('ok', `Channel name(s) updated: ${channels.filter((c) => c.name).map((c) => c.name).join(', ')}`);
+  } catch (err) {
+    log('warn', `Could not save the channel name(s): ${err.message}`);
+  }
 }
 
 // ---------------------------------------------------------------- actions
@@ -876,6 +1001,318 @@ async function unlink() {
   await ensureConnect({ force: true });
 }
 
+// ---------------------------------------------------------------- growth
+
+/** Load state + the growth block, rolling the daily counters if needed. */
+function growthStore() {
+  const state = loadState(cfg.channels[0]?.jid ?? '');
+  const growth = ensureGrowth(state);
+  rollGrowthDay(growth, dayKey());
+  return { state, growth };
+}
+
+function growthStatus() {
+  const { growth } = growthStore();
+  const now = Date.now();
+  const join = joinGate(growth, cfg.growth, now);
+  const share = nextShare(growth, cfg.growth, now);
+  return {
+    settings: cfg.growth,
+    enabled: cfg.growth.enabled,
+    dryRun: cfg.growth.dryRun,
+    candidates: growth.candidates.slice(-100),
+    joined: joinedGroups(growth).length,
+    pending: pendingCandidates(growth).length,
+    counters: {
+      day: growth.day,
+      joinsToday: growth.joinsToday,
+      sharesToday: growth.sharesToday,
+      lastJoinAt: growth.lastJoinAt,
+      lastShareAt: growth.lastShareAt,
+    },
+    join,
+    share: { ok: share.ok, reason: share.reason, candidate: share.candidate ?? null },
+    exa: Boolean(process.env.EXA_API_KEY),
+    lastSearch: growth.lastSearch,
+  };
+}
+
+/** Read a public invite without joining, so the user can approve it first. */
+async function previewGroup(link) {
+  const code = inviteCode(link);
+  if (!code) {
+    throw new Error('Paste a WhatsApp group invite link, e.g. https://chat.whatsapp.com/ABC123…');
+  }
+  await ensureConnect();
+  await waitForConnection();
+  const info = await sock.groupGetInviteInfo(code);
+  return {
+    code,
+    link: inviteLink(code),
+    jid: info?.id ?? '',
+    subject: info?.subject ?? '',
+    size: groupSize(info),
+    description: info?.desc ? String(info.desc).slice(0, 300) : '',
+  };
+}
+
+async function addGrowthCandidate(link) {
+  const preview = await previewGroup(link);
+  const { state, growth } = growthStore();
+  if (growth.candidates.some((c) => c.code === preview.code)) {
+    throw new Error('That group is already in the list.');
+  }
+  if (isBlocked(cfg.growth, preview.subject, preview.description)) {
+    throw new Error('That group matches one of your blocked words.');
+  }
+  if (!isAllowed(cfg.growth, preview)) {
+    throw new Error('That group is not in the allowlist.');
+  }
+
+  const candidate = makeCandidate(preview);
+  growth.candidates.push(candidate);
+  // This list is a working queue, not an archive.
+  if (growth.candidates.length > 200) growth.candidates = growth.candidates.slice(-200);
+  saveState(state);
+  log('ok', `Growth: queued ${candidateLabel(candidate)} (not joined yet).`);
+  pushStatus();
+  return candidate;
+}
+
+function findCandidate(growth, id) {
+  const candidate = growth.candidates.find((c) => c.id === id);
+  if (!candidate) throw new Error('That group is no longer in the list.');
+  return candidate;
+}
+
+function approveCandidate(id, approved = true) {
+  const { state, growth } = growthStore();
+  const candidate = findCandidate(growth, id);
+  if (candidate.joinedAt) return candidate;
+  candidate.status = approved ? 'approved' : 'pending';
+  candidate.error = '';
+  saveState(state);
+  log('info', `Growth: ${approved ? 'approved' : 'unapproved'} ${candidateLabel(candidate)}.`);
+  pushStatus();
+  return candidate;
+}
+
+/** Join one approved group, checking every cap first. */
+async function joinGrowthNow(id, { automatic = false } = {}) {
+  const { state, growth } = growthStore();
+  const candidate = findCandidate(growth, id);
+  if (candidate.joinedAt) return { already: true, candidate };
+
+  const gate = joinGate(growth, cfg.growth, Date.now());
+  if (!gate.ok) throw new Error(gate.reason);
+
+  if (cfg.growth.dryRun) {
+    // Remember the simulated action so the 10-minute worker does not log the
+    // same group over and over. Going live clears it naturally (new action).
+    candidate.dryJoinAt = Date.now();
+    saveState(state);
+    log('info', `Growth dry run: would join ${candidateLabel(candidate)} (${candidate.code}).`);
+    pushStatus();
+    return { dryRun: true, candidate };
+  }
+
+  await ensureConnect();
+  await waitForConnection();
+  const result = await sock.groupAcceptInvite(candidate.code);
+  const jid = typeof result === 'string' ? result : result?.id ?? '';
+  if (!jid) throw new Error('WhatsApp did not confirm the join.');
+
+  candidate.jid = jid;
+  candidate.joinedAt = Date.now();
+  candidate.status = 'joined';
+  candidate.error = '';
+  growth.joinsToday += 1;
+  growth.lastJoinAt = Date.now();
+
+  // The invite preview name can be stale; the group metadata is the truth.
+  try {
+    const meta = await sock.groupMetadata(jid);
+    if (meta?.subject) candidate.subject = meta.subject;
+    const size = groupSize(meta);
+    if (size) candidate.size = size;
+  } catch { /* join is what matters; the name can be filled in later */ }
+
+  saveState(state);
+  log('ok', `Growth: joined ${candidateLabel(candidate)}${automatic ? ' automatically' : ''}.`);
+  pushStatus();
+  return { dryRun: false, candidate };
+}
+
+/** Send the channel link to one group, once. */
+async function shareGrowthNow(id, { automatic = false } = {}) {
+  const { state, growth } = growthStore();
+  const candidate = findCandidate(growth, id);
+  if (!candidate.joinedAt) throw new Error('Join that group before sharing to it.');
+  if (candidate.sharedAt) return { already: true, candidate };
+
+  const settings = cfg.growth;
+  if (!settings.enabled) throw new Error('Growth is off.');
+  if (!settings.channelLink) throw new Error('Add your channel link first.');
+
+  const wait = settings.shareAfterHours * 3_600_000 - (Date.now() - candidate.joinedAt);
+  if (wait > 0) {
+    throw new Error(`Wait ${Math.ceil(wait / 3_600_000)}h more before sharing to this group.`);
+  }
+  if (growth.sharesToday >= settings.sharePerDay) {
+    throw new Error(`Daily share limit reached (${settings.sharePerDay}).`);
+  }
+  const gap = growth.lastShareAt
+    ? settings.shareGapMinutes * 60_000 - (Date.now() - growth.lastShareAt)
+    : 0;
+  if (gap > 0) throw new Error(`Next share in ${Math.ceil(gap / 60_000)} min.`);
+
+  const text = shareText(settings, candidate);
+  if (settings.dryRun) {
+    candidate.dryShareAt = Date.now();
+    saveState(state);
+    log('info', `Growth dry run: would share to ${candidateLabel(candidate)}:\n${text}`);
+    pushStatus();
+    return { dryRun: true, candidate, text };
+  }
+
+  await ensureConnect();
+  await waitForConnection();
+  await sock.sendMessage(candidate.jid, { text });
+
+  candidate.sharedAt = Date.now();
+  candidate.status = 'shared';
+  candidate.error = '';
+  growth.sharesToday += 1;
+  growth.lastShareAt = Date.now();
+  saveState(state);
+  log('ok', `Growth: shared the channel link to ${candidateLabel(candidate)}${automatic ? ' automatically' : ''}.`);
+  pushStatus();
+  return { dryRun: false, candidate, text };
+}
+
+async function leaveGrowthGroup(id) {
+  const { state, growth } = growthStore();
+  const candidate = findCandidate(growth, id);
+  if (!candidate.joinedAt) throw new Error('That group was never joined.');
+  if (!cfg.growth.dryRun) {
+    await ensureConnect();
+    await waitForConnection();
+    await sock.groupLeave(candidate.jid);
+  }
+  candidate.status = 'left';
+  candidate.error = '';
+  saveState(state);
+  log('warn', `Growth: left ${candidateLabel(candidate)}.`);
+  pushStatus();
+  return candidate;
+}
+
+function removeGrowthCandidate(id) {
+  const { state, growth } = growthStore();
+  const candidate = findCandidate(growth, id);
+  if (candidate.joinedAt && candidate.status !== 'left') {
+    throw new Error('That group was joined — use “Leave” instead of removing it.');
+  }
+  growth.candidates = growth.candidates.filter((c) => c.id !== id);
+  saveState(state);
+  pushStatus();
+  return candidate;
+}
+
+let lastExaSearchAt = 0;
+
+/** Find public invite links with Exa. Needs EXA_API_KEY on the server. */
+async function searchPublicGroups(query) {
+  const key = String(process.env.EXA_API_KEY ?? '').trim();
+  if (!key) throw new Error('Set EXA_API_KEY on the server to use web discovery.');
+  const text = String(query ?? '').trim();
+  if (!text) throw new Error('Type what to search for, e.g. “HSSC Haryana exam”.');
+  if (Date.now() - lastExaSearchAt < 20_000) {
+    throw new Error('Wait 20 seconds between searches.');
+  }
+  lastExaSearchAt = Date.now();
+
+  const res = await fetch('https://api.exa.ai/search', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-api-key': key },
+    body: JSON.stringify({
+      query: `${text} WhatsApp group invite link`,
+      type: 'neural',
+      numResults: 10,
+      contents: { text: { maxCharacters: 800 } },
+    }),
+  });
+  if (!res.ok) throw new Error(`Exa answered ${res.status}. Check the API key.`);
+
+  const data = await res.json();
+  const found = new Map();
+  for (const result of data.results ?? []) {
+    const blob = `${result.url ?? ''}\n${result.title ?? ''}\n${result.text ?? ''}`;
+    for (const match of blob.matchAll(/chat\.whatsapp\.com\/(?:invite\/)?([A-Za-z0-9]{10,})/g)) {
+      if (found.has(match[1])) continue;
+      found.set(match[1], {
+        code: match[1],
+        link: inviteLink(match[1]),
+        title: result.title ?? '',
+        url: result.url ?? '',
+        snippet: String(result.text ?? '').replace(/\s+/g, ' ').slice(0, 220),
+      });
+    }
+  }
+  const results = [...found.values()].slice(0, 15);
+
+  const { state, growth } = growthStore();
+  growth.lastSearch = { query: text, count: results.length, at: Date.now() };
+  saveState(state);
+  log('info', `Growth: Exa found ${results.length} invite link(s) for “${text}”.`);
+  pushStatus();
+  return results;
+}
+
+/**
+ * Background worker: joins one approved group and shares to one due group per
+ * tick. `cfg.growth.enabled` is the kill switch; `autoJoin`/`autoShare` decide
+ * whether each half runs without a click.
+ */
+async function growthTick() {
+  if (!cfg.growth.enabled) return { ok: false, reason: 'Growth is off.' };
+  if (batchRunning || connecting) return { ok: false, reason: 'A post is running — growth waits.' };
+
+  const actions = [];
+  if (cfg.growth.autoJoin) {
+    const { growth } = growthStore();
+    const gate = joinGate(growth, cfg.growth, Date.now());
+    const now = Date.now();
+    const next = growth.candidates.find((c) => c.status === 'approved'
+      && !c.joinedAt
+      && !(c.dryJoinAt && now - c.dryJoinAt < 12 * 3_600_000));
+    if (gate.ok && next) {
+      try {
+        await joinGrowthNow(next.id, { automatic: true });
+        actions.push(`join ${candidateLabel(next)}`);
+      } catch (err) {
+        log('warn', `Growth join failed: ${err.message}`);
+      }
+    }
+  }
+
+  if (cfg.growth.autoShare) {
+    // Re-read: the join above changed the counters and candidate list.
+    const { growth } = growthStore();
+    const share = nextShare(growth, cfg.growth, Date.now());
+    if (share.ok && share.candidate) {
+      try {
+        await shareGrowthNow(share.candidate.id, { automatic: true });
+        actions.push(`share ${candidateLabel(share.candidate)}`);
+      } catch (err) {
+        log('warn', `Growth share failed: ${err.message}`);
+      }
+    }
+  }
+
+  return { ok: true, actions };
+}
+
 // ---------------------------------------------------------------- server
 
 /**
@@ -906,6 +1343,95 @@ function isTrustedRequest(req) {
   return true;
 }
 
+// ---------------------------------------------------------------- panel auth
+
+const loginThrottle = createLoginThrottle();
+
+/** First hop of X-Forwarded-For, or the socket address. */
+function clientIp(req) {
+  const forwarded = String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim();
+  return forwarded || req.socket?.remoteAddress || 'unknown';
+}
+
+function loginPage({ error = '', retryAfter = 0 } = {}) {
+  const seconds = Math.ceil(retryAfter / 1000);
+  const message = error
+    ? `<p class="err">${error}${seconds ? ` Try again in ${seconds}s.` : ''}</p>`
+    : '<p class="hint">Enter the password set in <code>PANEL_PASSWORD</code>.</p>';
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Sign in · Question Poster</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center;
+    padding: 24px; background:
+      radial-gradient(900px 480px at 12% -12%, rgba(34,197,94,.14), transparent 62%),
+      radial-gradient(760px 420px at 100% -8%, rgba(96,165,250,.08), transparent 60%),
+      #0a0c10;
+    color: #e9eef7;
+    font: 15px/1.55 "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  .card {
+    width: min(380px, 100%); background: #14181f; border: 1px solid #232a35;
+    border-radius: 20px; padding: 28px; box-shadow: 0 24px 70px rgba(0,0,0,.45);
+  }
+  .logo {
+    width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center;
+    background: #12351f; border: 1px solid #1d5c33; font-size: 22px; margin-bottom: 16px;
+  }
+  h1 { font-size: 19px; margin: 0 0 6px; letter-spacing: -.2px; }
+  .hint { color: #94a1b5; font-size: 13px; margin: 0 0 18px; }
+  .hint code { color: #4ade80; font-size: 12px; }
+  .err {
+    color: #fecaca; background: rgba(239,68,68,.12); border: 1px solid rgba(239,68,68,.35);
+    border-radius: 12px; padding: 10px 12px; font-size: 13px; margin: 0 0 16px;
+  }
+  label { display: block; font-size: 12px; font-weight: 650; color: #94a1b5; margin: 0 0 7px; letter-spacing: .02em; }
+  input {
+    width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid #2e3744;
+    background: #0d1015; color: #e9eef7; font: inherit; outline: none;
+  }
+  input:focus { border-color: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.18); }
+  button {
+    width: 100%; margin-top: 16px; padding: 12px 14px; border: 0; border-radius: 12px;
+    background: #22c55e; color: #04140a; font: inherit; font-weight: 750; cursor: pointer;
+  }
+  button:hover { background: #4ade80; }
+  .foot { margin-top: 18px; font-size: 12px; color: #6b7789; text-align: center; }
+</style>
+</head>
+<body>
+  <form class="card" method="post" action="/login">
+    <div class="logo">🔒</div>
+    <h1>Question Poster</h1>
+    ${message}
+    <label for="password">Panel password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" autofocus required>
+    <button type="submit">Sign in</button>
+    <p class="foot">The panel controls a live WhatsApp account.</p>
+  </form>
+</body>
+</html>`;
+}
+
+function readSession(req) {
+  const cookies = parseCookies(req.headers.cookie);
+  return cookies[SESSION_COOKIE] ?? '';
+}
+
+const HTML_HEADERS = {
+  // SAMEORIGIN still blocks clickjacking from other sites but allows the
+  // panel's own layout tests to frame it.
+  'X-Frame-Options': 'SAMEORIGIN',
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+};
+
 const server = http.createServer(async (req, res) => {
   if (!isTrustedRequest(req)) {
     res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -915,8 +1441,49 @@ const server = http.createServer(async (req, res) => {
   const route = url.pathname;
 
   try {
+    const authed = !authRequired() || verifySessionToken(readSession(req));
+
+    // ---- login / logout (always reachable) ----------------------------
+    if (route === '/login') {
+      if (req.method === 'POST') {
+        const ip = clientIp(req);
+        const retryAfter = loginThrottle.retryAfter(ip);
+        if (retryAfter > 0) {
+          res.setHeader('Retry-After', String(Math.ceil(retryAfter / 1000)));
+          return sendHtml(res, 429, loginPage({
+            error: 'Too many incorrect attempts.',
+            retryAfter,
+          }), HTML_HEADERS);
+        }
+        const body = await readBody(req);
+        if (!checkPassword(body.password ?? url.searchParams.get('password') ?? '')) {
+          loginThrottle.fail(ip);
+          log('warn', `Wrong panel password from ${ip}`);
+          return sendHtml(res, 401, loginPage({ error: 'Wrong password.' }), HTML_HEADERS);
+        }
+        loginThrottle.reset(ip);
+        log('ok', `Panel sign-in from ${ip}`);
+        return redirect(res, '/', {
+          'Set-Cookie': sessionCookie(createSessionToken(), { secure: isSecureRequest(req) }),
+        });
+      }
+      if (authed) return redirect(res, '/');
+      return sendHtml(res, 200, loginPage(), HTML_HEADERS);
+    }
+
+    if (route === '/logout') {
+      return redirect(res, '/login', { 'Set-Cookie': clearCookie() });
+    }
+
+    if (!authed) {
+      if (route.startsWith('/api/')) {
+        return sendJson(res, 401, { ok: false, error: 'Login required. Reload the page.' });
+      }
+      return redirect(res, '/login');
+    }
+
     if (route === '/' || route === '/index.html') {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', ...HTML_HEADERS });
       return res.end(fs.readFileSync(UI_FILE));
     }
 
@@ -1044,6 +1611,69 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { ok: true });
     }
 
+    if (route === '/api/growth' && req.method === 'GET') {
+      return sendJson(res, 200, { ok: true, ...growthStatus() });
+    }
+
+    if (route === '/api/growth/settings' && req.method === 'POST') {
+      const body = await readBody(req);
+      const growth = normalizeGrowthSettings(body);
+      if (growth.channelLink
+        && !/^https:\/\/(www\.)?wa\.me\/channel\/|^https:\/\/(www\.)?whatsapp\.com\/channel\//i.test(growth.channelLink)) {
+        return sendJson(res, 400, {
+          ok: false,
+          error: 'Channel link should look like https://whatsapp.com/channel/0029V…',
+        });
+      }
+      saveConfigPatch({ growth });
+      return sendJson(res, 200, { ok: true, ...growthStatus() });
+    }
+
+    if (route === '/api/growth/preview' && req.method === 'POST') {
+      const { link } = await readBody(req);
+      return sendJson(res, 200, { ok: true, group: await previewGroup(link) });
+    }
+
+    if (route === '/api/growth/add' && req.method === 'POST') {
+      const { link } = await readBody(req);
+      return sendJson(res, 200, { ok: true, candidate: await addGrowthCandidate(link) });
+    }
+
+    if (route === '/api/growth/approve' && req.method === 'POST') {
+      const { id, approved } = await readBody(req);
+      return sendJson(res, 200, { ok: true, candidate: approveCandidate(id, approved !== false) });
+    }
+
+    if (route === '/api/growth/join' && req.method === 'POST') {
+      const { id } = await readBody(req);
+      return sendJson(res, 200, { ok: true, ...(await joinGrowthNow(id)) });
+    }
+
+    if (route === '/api/growth/share' && req.method === 'POST') {
+      const { id } = await readBody(req);
+      return sendJson(res, 200, { ok: true, ...(await shareGrowthNow(id)) });
+    }
+
+    if (route === '/api/growth/leave' && req.method === 'POST') {
+      const { id } = await readBody(req);
+      return sendJson(res, 200, { ok: true, candidate: await leaveGrowthGroup(id) });
+    }
+
+    if (route === '/api/growth/remove' && req.method === 'POST') {
+      const { id } = await readBody(req);
+      removeGrowthCandidate(id);
+      return sendJson(res, 200, { ok: true });
+    }
+
+    if (route === '/api/growth/search' && req.method === 'POST') {
+      const { query } = await readBody(req);
+      return sendJson(res, 200, { ok: true, results: await searchPublicGroups(query) });
+    }
+
+    if (route === '/api/growth/tick' && req.method === 'POST') {
+      return sendJson(res, 200, { ok: true, ...(await growthTick()) });
+    }
+
     if (route === '/api/batch' && req.method === 'POST') {
       // Not awaited: the run reports progress over SSE. The catch keeps a
       // double-click from becoming an unhandled rejection that kills the panel.
@@ -1087,6 +1717,47 @@ const server = http.createServer(async (req, res) => {
 
 // ---------------------------------------------------------------- boot
 
+/**
+ * A public deployment must never be reachable without a password.
+ *
+ * If PANEL_PASSWORD is not set, generate one on first boot and keep it in the
+ * data folder, so a forgotten setting cannot leave the panel (and a live
+ * WhatsApp session) open to the internet.
+ */
+function ensurePanelPassword() {
+  if (String(process.env.PANEL_PASSWORD ?? '').trim()) return;
+  // A loopback bind is not reachable from the network (desktop panel and the
+  // Android app), so no password is needed there. Anything else is public.
+  const loopback = ['127.0.0.1', 'localhost', '::1'].includes(HOST);
+  if (loopback) return;
+
+  const file = path.join(dataDir(), 'auth', 'panel-password.txt');
+  let saved = '';
+  try {
+    saved = fs.readFileSync(file, 'utf8').trim();
+  } catch { /* first boot */ }
+
+  const password = saved || randomBytes(9).toString('base64url');
+  if (!saved) {
+    try {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, `${password}\n`, { mode: 0o600 });
+    } catch (err) {
+      console.warn(`   ⚠️  Could not save the generated password: ${err.message}`);
+    }
+  }
+
+  process.env.PANEL_PASSWORD = password;
+  console.log('');
+  console.log('  🔒 Panel password (PANEL_PASSWORD not set):');
+  console.log(`     ${password}`);
+  console.log(`     Saved in ${file}`);
+  console.log('     Set PANEL_PASSWORD to choose your own; change it to sign out everywhere.');
+  console.log('');
+}
+
+ensurePanelPassword();
+
 try {
   acquireLock('control panel');
 } catch (err) {
@@ -1123,12 +1794,25 @@ server.listen(PORT, HOST, () => {
   log('info', targets.length
     ? `Targets: ${targets.map((t) => `${describeTarget(t)}${t.enabled ? '' : ' (off)'}`).join(', ')}`
     : 'No channel configured yet.');
+  log('info', authRequired()
+    ? 'Panel password protection is on — sign in at /login.'
+    : 'Panel password protection is off (local use only).');
+  if (dataDir() !== ROOT) log('info', `Data folder: ${dataDir()}`);
   if (process.env.NO_CONNECT !== 'true') {
     ensureConnect().catch((e) => log('err', e.message));
   }
 
   scheduleForwarder();
   armSchedule();
+
+  // Group growth runs on its own schedule, gated inside growthTick().
+  const growthTimer = setInterval(() => {
+    growthTick().catch((err) => log('warn', `Growth: ${err.message}`));
+  }, 10 * 60 * 1000);
+  growthTimer.unref?.();
+  setTimeout(() => {
+    growthTick().catch((err) => log('warn', `Growth: ${err.message}`));
+  }, 45 * 1000).unref?.();
 
   if (process.env.NO_BROWSER !== 'true') {
     const opener = process.platform === 'win32' ? `start "" "${url}"`

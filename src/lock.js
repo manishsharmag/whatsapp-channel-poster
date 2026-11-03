@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { projectRoot } from './config.js';
+import { dataDir } from './config.js';
 
-const LOCK_FILE = path.join(projectRoot(), 'state', 'app.lock');
+const LOCK_FILE = path.join(dataDir(), 'state', 'app.lock');
 
 function isAlive(pid) {
   try {

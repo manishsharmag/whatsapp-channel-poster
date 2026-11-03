@@ -6,7 +6,13 @@ import { isValidChannelJid } from './config.js';
  */
 
 export function waTarget(jid, name = '', enabled = true) {
-  return { kind: 'whatsapp', key: `wa:${jid}`, jid, label: name || jid, enabled };
+  // Never show a bare "1203…@newsletter" as the channel name. If WhatsApp has
+  // not given us the real title yet, a short "Channel …1234" is still readable.
+  const clean = String(name ?? '').trim();
+  const label = clean && clean !== jid
+    ? clean
+    : `Channel …${String(jid).replace(/@.*$/, '').slice(-4)}`;
+  return { kind: 'whatsapp', key: `wa:${jid}`, jid, label, enabled };
 }
 
 export function tgTarget(chatId, name = '', enabled = true) {

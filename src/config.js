@@ -1,11 +1,29 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { GROWTH_DEFAULTS, normalizeGrowthSettings } from './growth.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
+/**
+ * Where mutable files live: config.json, state/ and auth/.
+ *
+ * On a cloud host the app bundle is replaced on every deploy; DATA_DIR should
+ * point at a mounted volume so the WhatsApp session and posting progress are
+ * not wiped. Locally it defaults to the project folder (old behaviour).
+ */
+const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : ROOT;
+
 export function projectRoot() {
   return ROOT;
+}
+
+export function dataDir() {
+  return DATA_DIR;
+}
+
+export function configFile() {
+  return path.join(DATA_DIR, 'config.json');
 }
 
 /**
@@ -106,14 +124,26 @@ const DEFAULTS = {
     gapSeconds: -1, // -1 = use batch.gapSeconds
     style: '', // '' = use batch.style
   },
+
+  // Group growth: join public groups slowly and share the channel link once.
+  // Off by default, dry-run by default — this is the part that gets numbers
+  // banned when it is rushed.
+  growth: GROWTH_DEFAULTS,
 };
 
 export function loadConfig() {
-  const file = path.join(ROOT, 'config.json');
+  const file = configFile();
   const exampleFile = path.join(ROOT, 'config.example.json');
+  const bundled = path.join(ROOT, 'config.json');
 
   if (!fs.existsSync(file)) {
-    if (fs.existsSync(exampleFile)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    if (DATA_DIR !== ROOT && fs.existsSync(bundled)) {
+      // Keep the settings that were deployed with the app (channels, banks),
+      // then let the user edit them in the persistent volume.
+      console.log(`ℹ️  Seeding ${file} from the bundled config.json`);
+      fs.copyFileSync(bundled, file);
+    } else if (fs.existsSync(exampleFile)) {
       console.log('ℹ️  config.json not found — creating default config.json from config.example.json');
       fs.copyFileSync(exampleFile, file);
     } else {
@@ -256,6 +286,13 @@ export function loadConfig() {
     ? Number(cfg.schedule.gapSeconds)
     : -1;
   if (!['quiz', 'poll', 'text'].includes(cfg.schedule.style)) cfg.schedule.style = '';
+
+  // ---- group growth ----------------------------------------------------
+  cfg.growth = normalizeGrowthSettings(user.growth);
+  if (cfg.growth.enabled && !cfg.growth.channelLink) {
+    console.warn('⚠️  growth.enabled is on but growth.channelLink is empty — growth will wait.');
+  }
+
   if (cfg.mode === 'quiz' && cfg.postTimes.length < 2) {
     console.warn('⚠️  mode "quiz" needs two postTimes (question + answer). Falling back to "single".');
     cfg.mode = 'single';

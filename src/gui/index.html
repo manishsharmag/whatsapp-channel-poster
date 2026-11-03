@@ -155,18 +155,19 @@ h3 { font-size: 16px; font-weight: 650; }
 
 /* ---------- forms ---------- */
 label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 7px; letter-spacing: .15px; }
-input[type=text], input[type=password], input[type=number], input[type=tel], input[type=search], select {
+input[type=text], input[type=password], input[type=number], input[type=tel], input[type=search], textarea, select {
   width: 100%; padding: 12px 14px; border-radius: 12px;
   border: 1px solid var(--line); background: var(--bg2); color: var(--text);
   font-size: 16px; font-family: inherit; min-height: 46px;
   transition: border-color .15s, box-shadow .15s;
 }
-input:hover, select:hover { border-color: var(--line2); }
-input:focus, select:focus {
+textarea { resize: vertical; line-height: 1.45; }
+input:hover, textarea:hover, select:hover { border-color: var(--line2); }
+input:focus, textarea:focus, select:focus {
   outline: none; border-color: rgba(34, 197, 94, .65);
   box-shadow: 0 0 0 3px rgba(34, 197, 94, .15);
 }
-input::placeholder { color: #5c687a; }
+input::placeholder, textarea::placeholder { color: #5c687a; }
 select {
   appearance: none; -webkit-appearance: none;
   padding-right: 36px;
@@ -342,6 +343,27 @@ button.iconbtn:hover { color: #ffb4b4; border-color: rgba(239, 68, 68, .4); back
 .qrow input { min-height: 36px; padding: 6px 8px; text-align: center; }
 .qrow.short .qname span { color: #fcd34d; }
 .qrow.short input { border-color: rgba(245, 158, 11, .55); }
+.growlist { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.growrow {
+  display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center;
+  padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg2);
+}
+.growrow .gname { min-width: 0; }
+.growrow .gname b {
+  display: block; font-size: 12.5px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.growrow .gname span { font-size: 10.5px; color: var(--dim); }
+.growacts { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.growacts button { min-height: 32px; padding: 0 10px; border-radius: 9px; font-size: 11.5px; }
+.growresult {
+  padding: 9px 11px; border: 1px solid var(--line); border-radius: 11px;
+  background: var(--bg2); margin-top: 8px;
+}
+.growresult b { display: block; font-size: 12px; margin-bottom: 2px; }
+.growresult span { font-size: 10.5px; color: var(--dim); word-break: break-all; }
+.growresult .btnrow { margin-top: 8px; }
+.growresult .btnrow button { min-height: 30px; padding: 0 10px; font-size: 11.5px; }
 .hr { height: 1px; border: 0; background: var(--line); margin: 16px 0; }
 .mixnote {
   margin-top: 10px; padding: 9px 11px;
@@ -555,7 +577,7 @@ button.iconbtn:hover { color: #ffb4b4; border-color: rgba(239, 68, 68, .4); back
   .runs .when { grid-column: 1 / -1; }
   .dock-in { padding: 8px 12px; gap: 10px; }
   .dockbtns button { min-width: 0; padding: 0 12px; }
-  input[type=text], input[type=password], input[type=number], input[type=tel], input[type=search], select { font-size: 16px; }
+  input[type=text], input[type=password], input[type=number], input[type=tel], input[type=search], textarea, select { font-size: 16px; }
 }
 @media (max-width: 440px) {
   /* Keep all four tabs on screen without a sideways scroll. */
@@ -782,6 +804,7 @@ button.iconbtn:hover { color: #ffb4b4; border-color: rgba(239, 68, 68, .4); back
           <div class="check"><input type="checkbox" id="tgEnabled"><label for="tgEnabled">Also post to Telegram</label></div>
           <label for="tgToken">Bot token</label>
           <input type="password" id="tgToken" placeholder="123456789:AAE…" autocomplete="off">
+          <div class="hint" id="tgTokenHint" style="display:none">A token is saved. Leave this blank to keep it.</div>
           <div class="btnrow">
             <button id="tgSaveBtn" type="button">Save token</button>
             <button id="tgFindBtn" type="button">🔍 Find channels</button>
@@ -887,6 +910,75 @@ button.iconbtn:hover { color: #ffb4b4; border-color: rgba(239, 68, 68, .4); back
       </div>
     </div>
 
+    <div class="card" id="growthCard" style="margin-top:16px">
+      <div class="cardhead">
+        <h2>🌱 Grow the channel</h2>
+        <span class="chip" id="grBadge" hidden>On</span>
+      </div>
+      <div class="hint" style="margin-top:0">
+        Find public groups, join them slowly, then share your channel link once per group.
+        <b>Rushed joining and link-dropping is what gets a number banned</b> — keep the caps low
+        and leave dry run on until you have watched it work.
+      </div>
+
+      <div class="check"><input type="checkbox" id="grEnabled"><label for="grEnabled">Enable the growth worker</label></div>
+      <div class="check"><input type="checkbox" id="grDry"><label for="grDry">Dry run — log actions, join and send nothing</label></div>
+
+      <label for="grChannelLink">Your channel link</label>
+      <input type="text" id="grChannelLink" placeholder="https://whatsapp.com/channel/0029V…" autocomplete="off">
+
+      <div class="row" style="margin-top:12px">
+        <div><label for="grJoinPerDay">Joins / day</label><input type="number" id="grJoinPerDay" min="0" max="10" value="3" inputmode="numeric"></div>
+        <div><label for="grJoinGap">Minutes between joins</label><input type="number" id="grJoinGap" min="5" max="1440" value="60" inputmode="numeric"></div>
+        <div><label for="grMaxGroups">Max groups</label><input type="number" id="grMaxGroups" min="1" max="100" value="25" inputmode="numeric"></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <div><label for="grShareAfter">Wait before sharing (h)</label><input type="number" id="grShareAfter" min="1" max="168" value="24" inputmode="numeric"></div>
+        <div><label for="grSharePerDay">Shares / day</label><input type="number" id="grSharePerDay" min="0" max="10" value="2" inputmode="numeric"></div>
+        <div><label for="grShareGap">Minutes between shares</label><input type="number" id="grShareGap" min="1" max="1440" value="30" inputmode="numeric"></div>
+      </div>
+
+      <label style="margin-top:12px" for="grMessage">Message (use <code>{link}</code>)</label>
+      <textarea id="grMessage" rows="3"></textarea>
+
+      <label style="margin-top:12px" for="grAllow">Allowlist (optional — links or group IDs, comma separated)</label>
+      <input type="text" id="grAllow" placeholder="Leave empty to allow any public group">
+      <label style="margin-top:10px" for="grBlocked">Blocked words in the group name</label>
+      <input type="text" id="grBlocked" placeholder="adult, casino, loan">
+
+      <div class="check"><input type="checkbox" id="grAutoJoin"><label for="grAutoJoin">Auto-join approved groups</label></div>
+      <div class="check"><input type="checkbox" id="grAutoShare"><label for="grAutoShare">Auto-share when a group is old enough</label></div>
+
+      <div class="btnrow">
+        <button class="primary" id="grSaveBtn" type="button">Save growth settings</button>
+        <button class="ghost" id="grTickBtn" type="button">⚡ Run growth now</button>
+      </div>
+      <div class="status" id="grStatus">Off.</div>
+
+      <div class="subcard">
+        <div class="cardhead"><h2>Find groups</h2></div>
+        <div class="inline">
+          <input id="grSearch" type="text" placeholder="e.g. HSSC Haryana exam" autocomplete="off">
+          <button id="grSearchBtn" type="button">🔍 Search web</button>
+        </div>
+        <div class="hint" id="grSearchHint">Web search needs <b>EXA_API_KEY</b> on the server.</div>
+        <div id="grResults"></div>
+
+        <label style="margin-top:12px" for="grLink">Or paste an invite link</label>
+        <div class="inline">
+          <input id="grLink" type="text" placeholder="https://chat.whatsapp.com/…" autocomplete="off">
+          <button id="grPreviewBtn" type="button">Preview</button>
+          <button id="grAddBtn" type="button">＋ Queue</button>
+        </div>
+        <div id="grPreview"></div>
+      </div>
+
+      <div class="subcard">
+        <div class="cardhead"><h2>Groups</h2><span class="chip" id="grCount">0</span></div>
+        <div class="growlist" id="grList"><div class="empty">No groups queued yet.</div></div>
+      </div>
+    </div>
+
     <div class="card" style="margin-top:16px">
       <div class="cardhead"><h2>Recent runs</h2></div>
       <div id="runsBox"><div class="empty">No run recorded yet.</div></div>
@@ -935,6 +1027,17 @@ button.iconbtn:hover { color: #ffb4b4; border-color: rgba(239, 68, 68, .4); back
         </div>
 
         <div class="card">
+          <div class="cardhead"><h2>Panel access</h2></div>
+          <div class="kv"><span>Password</span><span id="sysAuth">—</span></div>
+          <div class="kv"><span>Data folder</span><span id="sysDataDir" style="word-break:break-all;text-align:right">—</span></div>
+          <div class="btnrow" style="margin-top:0">
+            <button id="logoutBtn" type="button">🔒 Sign out</button>
+          </div>
+          <div class="hint">Set <code>PANEL_PASSWORD</code> (and <code>DATA_DIR</code> on a cloud host) so
+            a redeploy keeps the session and progress.</div>
+        </div>
+
+        <div class="card">
           <div class="cardhead"><h2>Danger zone</h2></div>
           <div class="btnrow" style="margin-top:0">
             <button class="danger" id="unlinkBtn" type="button">🔌 Re-link WhatsApp</button>
@@ -980,6 +1083,10 @@ button.iconbtn:hover { color: #ffb4b4; border-color: rgba(239, 68, 68, .4); back
 const $ = (id) => document.getElementById(id);
 const post = async (p, body) => {
   const r = await fetch(p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  if (r.status === 401) {
+    location.href = '/login';
+    return { ok: false, error: 'Login required.' };
+  }
   return r.json();
 };
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -1060,6 +1167,8 @@ function renderChrome(s) {
   $('sysSchedule').textContent = s.schedule?.enabled
     ? `${(s.schedule.times ?? []).join(', ')} · ${(s.schedule.weekdays ?? []).length ? 'selected days' : 'every day'}`
     : 'Off';
+  $('sysAuth').textContent = s.auth?.required ? 'Password required' : 'Local, no password';
+  $('sysDataDir').textContent = s.dataDir ?? '—';
 }
 
 let configLoaded = false;
@@ -1075,6 +1184,8 @@ function settingsFromForm() {
       modules: [...$('modules').selectedOptions].map((o) => o.value),
       subtopics: [...$('subtopics').selectedOptions].map((o) => o.value),
       mode: $('order').value,
+      quotas: quotas.map((q) => ({ module: q.module, count: q.count })),
+      quotaOrder,
     },
     batch: {
       size: Number($('size').value),
@@ -1303,6 +1414,90 @@ function renderSchedule(s) {
   tick();
 }
 
+const GROWTH_STATUS = {
+  pending: 'Waiting for approval',
+  approved: 'Approved — will join',
+  joined: 'Joined',
+  shared: 'Shared',
+  left: 'Left',
+  failed: 'Failed',
+};
+
+function growthActions(c) {
+  const acts = [];
+  if (!c.joinedAt) {
+    if (c.status === 'pending') acts.push(['approve', 'Approve']);
+    if (c.status === 'approved') acts.push(['unapprove', 'Unapprove']);
+    acts.push(['join', 'Join now']);
+    acts.push(['remove', '✕']);
+  } else if (c.status !== 'left') {
+    if (!c.sharedAt) acts.push(['share', 'Share now']);
+    acts.push(['leave', 'Leave']);
+  } else {
+    acts.push(['remove', 'Remove']);
+  }
+  return acts.map(([act, label]) =>
+    `<button type="button" data-gr-act="${act}" data-gr-id="${esc(c.id)}">${esc(label)}</button>`).join('');
+}
+
+function renderGrowth(g) {
+  if (!g) return;
+  const st = g.settings ?? {};
+  const c = g.counters ?? {};
+
+  $('grBadge').hidden = !g.enabled;
+  $('grBadge').textContent = g.dryRun ? 'Dry run' : 'Live';
+
+  const bits = [];
+  bits.push(g.enabled
+    ? (g.dryRun
+      ? '<b>Dry run</b> — actions are logged, nothing is joined or sent.'
+      : '<b>Live</b> — actions use your WhatsApp account.')
+    : 'Off — the growth worker does nothing.');
+  bits.push(esc(`${g.joined ?? 0} joined · ${g.pending ?? 0} queued · ${c.joinsToday ?? 0}/${st.joinPerDay ?? 0} joins today · ${c.sharesToday ?? 0}/${st.sharePerDay ?? 0} shares today`));
+  if (g.enabled) {
+    bits.push(g.join?.ok ? '✅ A join is allowed now.' : `⏳ Join: ${esc(g.join?.reason ?? '—')}`);
+    bits.push(g.share?.ok ? '✅ A share is due now.' : `⏳ Share: ${esc(g.share?.reason ?? '—')}`);
+  }
+  $('grStatus').innerHTML = bits.join('<br>');
+
+  $('grSearchHint').innerHTML = g.exa
+    ? 'Exa is configured — results show public invite links only. Always preview before joining.'
+    : 'Web search needs <b>EXA_API_KEY</b> on the server. You can still paste an invite link below.';
+
+  const rows = (g.candidates ?? []).slice().sort((a, b) => (b.addedAt ?? 0) - (a.addedAt ?? 0));
+  $('grCount').textContent = String(rows.length);
+  if (!rows.length) {
+    $('grList').innerHTML = '<div class="empty">No groups queued yet. Search or paste an invite link above.</div>';
+    return;
+  }
+
+  $('grList').innerHTML = rows.map((row) => {
+    const details = [GROWTH_STATUS[row.status] ?? row.status];
+    if (row.size) details.push(`${row.size} members`);
+    if (row.joinedAt && !row.sharedAt && row.status !== 'left') {
+      const due = row.joinedAt + (st.shareAfterHours ?? 24) * 3_600_000;
+      const hours = Math.ceil((due - Date.now()) / 3_600_000);
+      details.push(hours > 0 ? `share in ~${hours}h` : 'share due');
+    }
+    if (row.sharedAt) details.push('link shared');
+    if (row.error) details.push(row.error);
+    return `<div class="growrow">
+      <div class="gname">
+        <b title="${esc(row.subject)}">${esc(row.subject)}</b>
+        <span>${esc(details.join(' · '))}</span>
+      </div>
+      <div class="growacts">${growthActions(row)}</div>
+    </div>`;
+  }).join('');
+}
+
+async function refreshGrowth() {
+  const r = await fetch('/api/growth').then((x) => x.json()).catch(() => null);
+  if (r?.ok) renderGrowth(r);
+  return r;
+}
+
 function renderRuns(s) {
   const runs = s.runs ?? [];
   const box = $('runsBox');
@@ -1350,6 +1545,19 @@ function updateAvail() {
   const n = topics.available ?? 0;
   const target = current.targets.find((t) => t.key === activeTarget);
   const where = target ? target.label : 'this channel';
+
+  if (quotas.length) {
+    const want = mixTotal();
+    // Counted locally so typing a number never refetches the inventory and
+    // steals focus from the input.
+    const ready = mixReady();
+    $('availChip').textContent = `${ready} / ${want} ready`;
+    $('avail').innerHTML = ready < want
+      ? `<b>${ready}</b> of ${want} questions in this mix are available now — ${want - ready} short because a subject has too few unsent questions.`
+      : `All <b>${want}</b> questions for this mix are available now.`;
+    return;
+  }
+
   $('availChip').textContent = `${n.toLocaleString()} left`;
   if (!$('modules').selectedOptions.length && !$('subtopics').selectedOptions.length) {
     $('avail').innerHTML = `<b>${n}</b> questions still unsent to ${esc(where)}.`;
@@ -1377,6 +1585,7 @@ async function refreshTopics() {
     fillSelect($('modules'), r.modules, keepMods, (m) => `${m.name}  -  ${m.unsent}/${m.total} left`);
     fillSelect($('subtopics'), r.subtopics.filter((s) => s.name), keepSubs, (s) => `${s.name}  -  ${s.unsent}/${s.total} left`);
     syncPickers();
+    renderQuotas();
     updateAvail();
   }, topicsLoaded ? 120 : 0);
   topicsLoaded = true;
@@ -1411,6 +1620,7 @@ function applyStatus(s) {
   renderTargets(s);
   renderForward(s);
   renderSchedule(s);
+  renderGrowth(s.growth);
   renderRuns(s);
 
   if (s.status === 'connected') {
@@ -1444,9 +1654,16 @@ function applyStatus(s) {
     $('scorePoll').checked = s.config.batch.scorePoll !== false;
     $('style').value = s.config.batch.style ?? 'quiz';
     $('order').value = s.config.selection?.mode ?? 'sequence';
+    quotas = (s.config.selection?.quotas ?? []).map((q) => ({ module: q.module, count: q.count }));
+    quotaOrder = s.config.selection?.quotaOrder === 'mixed' ? 'mixed' : 'grouped';
+    sizeBeforeMix = s.config.batch.size ?? 50;
     $('dryRun').checked = !!s.config.dryRun;
     $('tgEnabled').checked = s.config.telegram?.enabled === true;
-    $('tgToken').value = s.config.telegram?.botToken ?? '';
+    // The token never travels to the browser. A blank box means "keep saved".
+    $('tgToken').value = '';
+    const hasToken = s.config.hasTelegramToken === true;
+    $('tgTokenHint').style.display = hasToken ? '' : 'none';
+    $('tgToken').placeholder = hasToken ? 'Saved — leave blank to keep' : '123456789:AAE…';
     const fw = s.config.forwarder ?? {};
     $('fwEnabled').checked = fw.enabled === true;
     $('fwInterval').value = fw.intervalMinutes ?? 60;
@@ -1456,6 +1673,21 @@ function applyStatus(s) {
     $('fwBlocked').value = (fw.blocked ?? []).join(', ');
     $('fwHeader').checked = fw.header !== false;
     $('fwDry').checked = fw.dryRun === true;
+    const gr = s.config.growth ?? {};
+    $('grEnabled').checked = gr.enabled === true;
+    $('grDry').checked = gr.dryRun !== false;
+    $('grChannelLink').value = gr.channelLink ?? '';
+    $('grJoinPerDay').value = gr.joinPerDay ?? 3;
+    $('grJoinGap').value = gr.joinGapMinutes ?? 60;
+    $('grMaxGroups').value = gr.maxGroups ?? 25;
+    $('grShareAfter').value = gr.shareAfterHours ?? 24;
+    $('grSharePerDay').value = gr.sharePerDay ?? 2;
+    $('grShareGap').value = gr.shareGapMinutes ?? 30;
+    $('grMessage').value = gr.message ?? '';
+    $('grAllow').value = (gr.allowlist ?? []).join(', ');
+    $('grBlocked').value = (gr.blocked ?? []).join(', ');
+    $('grAutoJoin').checked = gr.autoJoin === true;
+    $('grAutoShare').checked = gr.autoShare === true;
     if (s.config.phoneNumber) $('pairPhone').value = s.config.phoneNumber;
     syncAnswerCheckbox();
     syncStyleRadios();
@@ -1666,6 +1898,175 @@ $('reconnectBtn').onclick = () => {
   post('/api/reconnect');
 };
 
+// ---- group growth -------------------------------------------------------
+
+function growthFromForm() {
+  const list = (id) => $(id).value.split(',').map((v) => v.trim()).filter(Boolean);
+  return {
+    enabled: $('grEnabled').checked,
+    dryRun: $('grDry').checked,
+    channelLink: $('grChannelLink').value.trim(),
+    message: $('grMessage').value.trim(),
+    joinPerDay: Number($('grJoinPerDay').value) || 0,
+    joinGapMinutes: Number($('grJoinGap').value) || 60,
+    maxGroups: Number($('grMaxGroups').value) || 25,
+    shareAfterHours: Number($('grShareAfter').value) || 24,
+    sharePerDay: Number($('grSharePerDay').value) || 0,
+    shareGapMinutes: Number($('grShareGap').value) || 30,
+    allowlist: list('grAllow'),
+    blocked: list('grBlocked'),
+    autoJoin: $('grAutoJoin').checked,
+    autoShare: $('grAutoShare').checked,
+  };
+}
+
+$('grSaveBtn').onclick = async () => {
+  const body = growthFromForm();
+  if (body.enabled && !body.channelLink) {
+    toast('Add your channel link before enabling growth.', 'warn');
+    return;
+  }
+  const r = await post('/api/growth/settings', body);
+  if (r.error) {
+    toast(r.error, 'err');
+    return;
+  }
+  renderGrowth(r);
+  toast(body.enabled
+    ? (body.dryRun ? 'Growth saved — dry run, nothing will be joined or sent.' : 'Growth saved — live.')
+    : 'Growth turned off.');
+};
+
+$('grTickBtn').onclick = async () => {
+  $('grTickBtn').disabled = true;
+  const r = await post('/api/growth/tick');
+  $('grTickBtn').disabled = false;
+  if (r.error) toast(r.error, 'err');
+  else if (r.actions?.length) toast(`Growth: ${r.actions.join(', ')}.`);
+  else toast(r.reason ?? 'Nothing is due right now.');
+  await refreshGrowth();
+};
+
+$('grSearchBtn').onclick = async () => {
+  const query = $('grSearch').value.trim();
+  if (!query) {
+    toast('Type what to search for first.', 'warn');
+    return;
+  }
+  $('grSearchBtn').disabled = true;
+  $('grResults').innerHTML = '<div class="empty">Searching…</div>';
+  const r = await post('/api/growth/search', { query });
+  $('grSearchBtn').disabled = false;
+  if (r.error) {
+    $('grResults').innerHTML = `<div class="empty">${esc(r.error)}</div>`;
+    toast(r.error, 'err');
+    return;
+  }
+  const results = r.results ?? [];
+  $('grResults').innerHTML = results.length
+    ? results.map((item) => `<div class="growresult">
+        <b>${esc(item.title || item.link)}</b>
+        <span>${esc(item.snippet || item.link)}</span>
+        <div class="btnrow"><button type="button" data-gr-add="${esc(item.link)}">＋ Queue this group</button></div>
+      </div>`).join('')
+    : '<div class="empty">No public invite links found. Try a different query.</div>';
+  toast(results.length ? `${results.length} invite link(s) found.` : 'No invite links found.');
+};
+
+function renderGroupPreview(group) {
+  $('grPreview').innerHTML = `<div class="growresult">
+    <b>${esc(group.subject || 'Group')}</b>
+    <span>${group.size ? `${esc(group.size)} members · ` : ''}${esc(group.link)}</span>
+    <div class="btnrow"><button type="button" data-gr-add="${esc(group.link)}">＋ Queue this group</button></div>
+  </div>`;
+}
+
+$('grPreviewBtn').onclick = async () => {
+  const link = $('grLink').value.trim();
+  if (!link) {
+    toast('Paste an invite link first.', 'warn');
+    return;
+  }
+  $('grPreviewBtn').disabled = true;
+  const r = await post('/api/growth/preview', { link });
+  $('grPreviewBtn').disabled = false;
+  if (r.error) {
+    toast(r.error, 'err');
+    return;
+  }
+  renderGroupPreview(r.group);
+};
+
+$('grAddBtn').onclick = async () => {
+  const link = $('grLink').value.trim();
+  if (!link) {
+    toast('Paste an invite link first.', 'warn');
+    return;
+  }
+  $('grAddBtn').disabled = true;
+  const r = await post('/api/growth/add', { link });
+  $('grAddBtn').disabled = false;
+  if (r.error) {
+    toast(r.error, 'err');
+    return;
+  }
+  $('grLink').value = '';
+  $('grPreview').innerHTML = '';
+  toast(`Queued ${r.candidate?.subject ?? 'the group'} — approve it before it can join.`);
+  await refreshGrowth();
+};
+
+document.addEventListener('click', async (e) => {
+  const add = e.target.closest('[data-gr-add]');
+  if (!add) return;
+  add.disabled = true;
+  const r = await post('/api/growth/add', { link: add.dataset.grAdd });
+  add.disabled = false;
+  if (r.error) {
+    toast(r.error, 'err');
+    return;
+  }
+  toast(`Queued ${r.candidate?.subject ?? 'the group'} — approve it before it can join.`);
+  await refreshGrowth();
+});
+
+$('grList').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-gr-act]');
+  if (!btn) return;
+  const act = btn.dataset.grAct;
+  const id = btn.dataset.grId;
+  if ((act === 'leave' || act === 'remove')
+    && !confirm(act === 'leave' ? 'Leave this WhatsApp group?' : 'Remove this group from the list?')) {
+    return;
+  }
+  const paths = {
+    approve: '/api/growth/approve',
+    unapprove: '/api/growth/approve',
+    join: '/api/growth/join',
+    share: '/api/growth/share',
+    leave: '/api/growth/leave',
+    remove: '/api/growth/remove',
+  };
+  const path = paths[act];
+  if (!path) return;
+  btn.disabled = true;
+  const r = await post(path, act === 'unapprove' ? { id, approved: false } : { id });
+  if (r.error) toast(r.error, 'err');
+  else if (act === 'share' && r.dryRun) toast('Dry run — the link was logged but not sent.', 'warn');
+  else {
+    const done = {
+      approve: 'Approved — it can be joined now.',
+      unapprove: 'Approval removed.',
+      join: r.dryRun ? 'Dry run — join logged, nothing changed.' : 'Joined the group.',
+      share: 'Channel link shared.',
+      leave: 'Left the group.',
+      remove: 'Removed from the list.',
+    };
+    toast(done[act] ?? 'Done.', act === 'join' && r.dryRun ? 'warn' : 'ok');
+  }
+  await refreshGrowth();
+});
+
 // ---- automatic schedule
 
 $('schSaveBtn').onclick = async () => {
@@ -1710,6 +2111,10 @@ $('unlinkBtn').onclick = async () => {
   if (!confirm('Re-link WhatsApp?\n\nThis deletes the saved session and you will have to scan a new QR code.')) return;
   toast('Unlinking — a new QR will appear shortly…', 'warn');
   await post('/api/unlink');
+};
+
+$('logoutBtn').onclick = () => {
+  location.href = '/logout';
 };
 
 $('addChannelBtn').onclick = async () => {
@@ -1766,10 +2171,12 @@ $('tgEnabled').onchange = async () => {
 };
 
 $('clearFilterBtn').onclick = () => {
+  quotas = [];
   [...$('modules').options].forEach((o) => { o.selected = false; });
   [...$('subtopics').options].forEach((o) => { o.selected = false; });
   $('moduleSearch').value = '';
   $('subSearch').value = '';
+  renderQuotas();
   refreshTopics();
   toast('Using every question.');
 };
@@ -1893,7 +2300,7 @@ function buildPicker(selectId, rootId, searchId) {
       return;
     }
     root.innerHTML = options.map((o) => {
-      const [name, count = ''] = o.textContent.split('  —  ');
+      const [name, count = ''] = o.textContent.split(/\s{2}[—–-]\s{2}/);
       return `<button type="button" class="opt ${o.selected ? 'on' : ''}" data-val="${esc(o.value)}" aria-pressed="${o.selected}">
         <span class="tick">✓</span><span>${esc(name)}</span><span class="cnt">${esc(count.trim())}</span>
       </button>`;
@@ -1905,6 +2312,12 @@ function buildPicker(selectId, rootId, searchId) {
     if (!btn) return;
     const option = [...select.options].find((o) => o.value === btn.dataset.val);
     if (!option) return;
+    // Touching the topic chips means "filter by topic", which the mix replaces.
+    if (quotas.length) {
+      quotas = [];
+      renderQuotas();
+      toast('Mix cleared — using the module/subtopic filter instead.');
+    }
     option.selected = !option.selected;
     render();
     updatePickerCounts();
@@ -1935,6 +2348,243 @@ function syncPickers() {
   for (const render of pickerRenders) render();
   updatePickerCounts();
 }
+
+// ---- question mix (presets + per-subject quotas) ----------------------
+
+let quotas = [];
+let quotaOrder = 'grouped';
+let sizeBeforeMix = 50;
+
+function mixTotal() {
+  return quotas.reduce((n, q) => n + q.count, 0);
+}
+
+/** How many of the mix can actually be sent right now (a subject may be short). */
+function mixReady() {
+  return quotas.reduce((n, q) => {
+    const m = topics.modules.find((x) => x.name === q.module);
+    return n + Math.min(q.count, m?.unsent ?? 0);
+  }, 0);
+}
+
+function modulesMatching(re) {
+  return topics.modules.filter((m) => re.test(m.name) && m.unsent > 0);
+}
+
+/** 10 Maths + 10 Reasoning + 10 English + 10 Hindi + 10 GK. */
+function balancedQuotas() {
+  const groups = [
+    /quantitative|mathemat|\bmaths?\b/i,
+    /reasoning/i,
+    /english/i,
+    /hindi/i,
+    /general awareness|general knowledge|static gk|current affairs/i,
+  ];
+  const used = new Set();
+  const out = [];
+  for (const re of groups) {
+    const mod = topics.modules.find((m) => !used.has(m.name) && re.test(m.name) && m.unsent > 0);
+    if (!mod) continue;
+    used.add(mod.name);
+    out.push({ module: mod.name, count: Math.min(10, mod.unsent) });
+  }
+  return out;
+}
+
+function mathsQuotas() {
+  const out = [];
+  for (const re of [/quantitative|mathemat|\bmaths?\b/i, /reasoning/i]) {
+    const mod = topics.modules.find((m) => re.test(m.name) && m.unsent > 0);
+    if (mod) out.push({ module: mod.name, count: Math.min(25, mod.unsent) });
+  }
+  return out;
+}
+
+function eachQuotas() {
+  return topics.modules
+    .filter((m) => m.unsent > 0)
+    .map((m) => ({ module: m.name, count: Math.min(10, m.unsent) }));
+}
+
+function sameQuotas(a, b) {
+  if (a.length !== b.length) return false;
+  return a.every((q) => b.some((x) => x.module === q.module && x.count === q.count));
+}
+
+function presetLabelHtml() {
+  const total = (list) => list.reduce((n, q) => n + q.count, 0);
+  const balanced = total(balancedQuotas());
+  const each = total(eachQuotas());
+  const maths = total(mathsQuotas());
+  const set = (id, text) => {
+    const el = document.querySelector(`[data-preset="${id}"]`);
+    if (el) el.textContent = text;
+  };
+  set('balanced', balanced ? `⚖️ Balanced ${balanced}` : '⚖️ Balanced 50');
+  set('each', each ? `🔢 10 each · ${each}` : '🔢 10 each subject');
+  set('maths', maths ? `➗ Maths + Reasoning · ${maths}` : '➗ Maths + Reasoning');
+}
+
+function renderQuotas() {
+  const box = $('quotaRows');
+  if (!box) return;
+
+  box.innerHTML = quotas.map((q) => {
+    const mod = topics.modules.find((m) => m.name === q.module);
+    const left = mod?.unsent ?? 0;
+    const short = q.count > left;
+    return `<div class="qrow ${short ? 'short' : ''}">
+      <div class="qname"><b>${esc(q.module)}</b><span>${left} unsent${short ? ` — only ${left} left` : ''}</span></div>
+      <input type="number" min="1" max="1000" value="${q.count}" data-qcount="${esc(q.module)}" aria-label="${esc(q.module)} questions">
+      <button class="iconbtn" type="button" data-qdel="${esc(q.module)}" title="Remove ${esc(q.module)}">✕</button>
+    </div>`;
+  }).join('');
+
+  const taken = new Set(quotas.map((q) => q.module));
+  $('quotaAdd').innerHTML = '<option value="">＋ Add a subject…</option>'
+    + topics.modules
+      .filter((m) => !taken.has(m.name))
+      .map((m) => `<option value="${esc(m.name)}">${esc(m.name)} · ${m.unsent} left</option>`)
+      .join('');
+
+  const total = mixTotal();
+  const ready = mixReady();
+  $('mixTotal').textContent = quotas.length
+    ? `${quotas.length} subject${quotas.length > 1 ? 's' : ''} · ${total} question${total === 1 ? '' : 's'}${ready < total ? ` · ${ready} ready now` : ''}`
+    : 'All questions';
+  $('quotaClear').hidden = !quotas.length;
+  $('quotaOrderSeg').hidden = !quotas.length;
+  $('mixNote').hidden = !quotas.length;
+
+  document.querySelectorAll('input[name="quotaOrderPick"]').forEach((el) => {
+    el.checked = el.value === quotaOrder;
+  });
+
+  const balanced = balancedQuotas();
+  const maths = mathsQuotas();
+  const each = eachQuotas();
+  const active = sameQuotas(quotas, balanced) && quotas.length
+    ? 'balanced'
+    : sameQuotas(quotas, maths) && quotas.length
+      ? 'maths'
+      : sameQuotas(quotas, each) && quotas.length ? 'each' : '';
+  document.querySelectorAll('[data-preset]').forEach((el) => {
+    el.classList.toggle('on', el.dataset.preset === active
+      || (el.dataset.preset === 'random' && !quotas.length && $('order').value === 'random'));
+  });
+
+  syncSizeFromMix();
+  presetLabelHtml();
+}
+
+function syncSizeFromMix() {
+  const on = quotas.length > 0;
+  if (on) {
+    if (!$('size').disabled) sizeBeforeMix = Number($('size').value) || 50;
+    $('size').disabled = true;
+    $('size').value = mixTotal();
+  } else {
+    if ($('size').disabled) $('size').value = sizeBeforeMix;
+    $('size').disabled = false;
+  }
+  renderEstimate();
+}
+
+/** A mix and the topic filter cannot both apply; clear the filter on first use. */
+function clearTopicFilter() {
+  [...$('modules').options].forEach((o) => { o.selected = false; });
+  [...$('subtopics').options].forEach((o) => { o.selected = false; });
+  $('moduleSearch').value = '';
+  $('subSearch').value = '';
+  syncPickers();
+}
+
+function applyMix(list, { order = 'grouped', toastText = '' } = {}) {
+  quotas = list.map((q) => ({ ...q }));
+  quotaOrder = order;
+  if (quotas.length) clearTopicFilter();
+  renderQuotas();
+  updateAvail();
+  if (toastText) toast(toastText, quotas.length ? 'ok' : 'warn');
+}
+
+$('presetBar').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-preset]');
+  if (!btn) return;
+  const id = btn.dataset.preset;
+
+  if (id === 'random') {
+    quotas = [];
+    $('order').value = 'random';
+    if ($('order').onchange) $('order').onchange();
+    $('size').disabled = false;
+    if (sizeBeforeMix) $('size').value = sizeBeforeMix;
+    renderQuotas();
+    renderEstimate();
+    toast('Random 50 — questions from every subject, shuffled.');
+    return;
+  }
+
+  const list = id === 'balanced' ? balancedQuotas()
+    : id === 'maths' ? mathsQuotas()
+      : eachQuotas();
+  if (!list.length) {
+    toast('No subject with unsent questions was found for that preset.', 'warn');
+    return;
+  }
+  applyMix(list, {
+    order: 'grouped',
+    toastText: id === 'each'
+      ? `Mix ready — 10 from each subject (${list.reduce((n, q) => n + q.count, 0)} questions).`
+      : `Mix ready — ${list.reduce((n, q) => n + q.count, 0)} questions from ${list.length} subjects.`,
+  });
+});
+
+$('quotaRows').addEventListener('input', (e) => {
+  const input = e.target.closest('[data-qcount]');
+  if (!input) return;
+  const row = quotas.find((q) => q.module === input.dataset.qcount);
+  if (!row) return;
+  row.count = Math.max(1, Math.min(1000, Math.floor(Number(input.value) || 1)));
+  const total = mixTotal();
+  $('size').value = total;
+  $('mixTotal').textContent = `${quotas.length} subject${quotas.length > 1 ? 's' : ''} · ${total} question${total === 1 ? '' : 's'}`;
+  updateAvail();
+  renderEstimate();
+});
+
+$('quotaRows').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-qdel]');
+  if (!btn) return;
+  quotas = quotas.filter((q) => q.module !== btn.dataset.qdel);
+  renderQuotas();
+  updateAvail();
+});
+
+$('quotaAdd').addEventListener('change', () => {
+  const module = $('quotaAdd').value;
+  if (!module) return;
+  const mod = topics.modules.find((m) => m.name === module);
+  quotas.push({ module, count: Math.min(10, mod?.unsent ?? 10) || 1 });
+  $('quotaAdd').value = '';
+  if (quotas.length === 1) clearTopicFilter();
+  renderQuotas();
+  updateAvail();
+});
+
+$('quotaClear').addEventListener('click', () => {
+  quotas = [];
+  renderQuotas();
+  updateAvail();
+  toast('Mix cleared — every question is used again.');
+});
+
+document.querySelectorAll('input[name="quotaOrderPick"]').forEach((el) => {
+  el.onchange = () => {
+    quotaOrder = el.value;
+    renderQuotas();
+  };
+});
 
 // ---- sections ---------------------------------------------------------
 
@@ -2040,7 +2690,13 @@ renderEstimate();
 
 // ---- boot
 
-fetch('/api/status').then((r) => r.json()).then(applyStatus).catch(() => {});
+fetch('/api/status').then((r) => {
+  if (r.status === 401) {
+    location.href = '/login';
+    return null;
+  }
+  return r.json();
+}).then((s) => { if (s) applyStatus(s); }).catch(() => {});
 
 const es = new EventSource('/api/events');
 es.addEventListener('status', (ev) => applyStatus(JSON.parse(ev.data)));

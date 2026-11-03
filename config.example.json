@@ -21,7 +21,9 @@
   "selection": {
     "modules": [],
     "subtopics": [],
-    "mode": "sequence"
+    "mode": "sequence",
+    "quotas": [],
+    "quotaOrder": "grouped"
   },
   "bankPaths": [
     "./banks/Court_Clerk_2000_Master_Question_Bank.json",
@@ -67,5 +69,21 @@
     "scorePoll": true,
     "scorePollPrompt": "❓ *What's your score?* Tap the band you got 👇",
     "scoreBands": []
+  },
+  "growth": {
+    "enabled": false,
+    "dryRun": true,
+    "channelLink": "",
+    "message": "👋 Daily HSSC / HSSC Group D quiz with answers (English + Hindi).\nJoin the channel: {link}",
+    "joinPerDay": 3,
+    "joinGapMinutes": 60,
+    "shareAfterHours": 24,
+    "sharePerDay": 2,
+    "shareGapMinutes": 30,
+    "maxGroups": 25,
+    "autoJoin": false,
+    "autoShare": false,
+    "allowlist": [],
+    "blocked": []
   }
 }

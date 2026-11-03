@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { projectRoot } from './config.js';
+import { projectRoot, dataDir } from './config.js';
 
-const DIR = path.join(projectRoot(), 'state');
+const DIR = path.join(dataDir(), 'state');
 const FILE = path.join(DIR, 'state.json');
 const BACKUP = path.join(DIR, 'state.backup.json');
 
